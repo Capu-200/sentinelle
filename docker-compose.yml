@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: fraud_db
+      POSTGRES_USER: fraud_user
+      POSTGRES_PASSWORD: fraud_pwd
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgresql+psycopg2://fraud_user:fraud_pwd@postgres:5432/fraud_db
+    ports:
+      - "8000:8000"
+
+volumes:
+  postgres_data:
