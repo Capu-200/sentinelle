@@ -35,10 +35,17 @@ Exemple :
 
 ## Documentation (source de vérité)
 
+### Guide d'utilisation
+
+- **`GUIDE-UTILISATION.md`** — **Guide complet d'utilisation** (commandes, tests, règles, troubleshooting)
+
+### Documentation technique
+
 - `docs/00-architecture.md` — **Architecture du projet** (structure, modules, flux)
 - `docs/01-requirements-and-decisions.md` — périmètre, contraintes, hypothèses v1
 - `docs/02-api-contract.md` — contrat JSON (entrée / sortie) + exemples
 - `docs/03-rules.md` — règles R1→R4 (v1 proposées, à ajuster)
+- `docs/03-rules-detailed.md` — règles R1→R15 détaillées
 - `docs/04-feature-engineering.md` — features comportementales + fenêtres temporelles
 - `docs/05-models.md` — modèles supervisé / non supervisé (choix & entraînement)
 - `docs/06-scoring-thresholds.md` — score global, décisions, calibration, tuning

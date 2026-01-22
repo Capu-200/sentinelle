@@ -163,11 +163,24 @@ def main():
         scorer = GlobalScorer(config_path=args.scoring_config)
         decision_engine = DecisionEngine(config_path=args.decision_config)
 
+        tx_id = transaction.get("transaction_id", "N/A")
+        
         # 1. Feature Engineering
-        print("\n📊 Calcul des features...")
+        print(f"\n📊 Calcul des features (tx_id: {tx_id})...")
         from datetime import datetime
+        from dateutil.tz import UTC
 
-        current_time = datetime.fromisoformat(transaction["created_at"].replace("Z", "+00:00"))
+        # Parser le datetime et s'assurer qu'il est en UTC aware
+        created_at_str = transaction["created_at"]
+        if created_at_str.endswith("Z"):
+            created_at_str = created_at_str[:-1] + "+00:00"
+        current_time = datetime.fromisoformat(created_at_str)
+
+        # S'assurer que c'est en UTC
+        if current_time.tzinfo is None:
+            current_time = current_time.replace(tzinfo=UTC)
+        else:
+            current_time = current_time.astimezone(UTC)
 
         # Récupérer l'historique pour les features
         historical_data = store.get_historical_data(
@@ -179,24 +192,50 @@ def main():
         print(f"   ✅ {len(features)} features calculées")
 
         # 2. Règles métier
-        print("\n⚖️  Évaluation des règles métier...")
+        print(f"\n⚖️  Évaluation des règles métier (tx_id: {tx_id})...")
 
         # Récupérer les infos wallet/user pour les règles
         wallet_info = store.get_wallet_info(transaction["source_wallet_id"])
         user_profile = store.get_user_profile(transaction["initiator_user_id"])
+        destination_wallet_info = store.get_wallet_info(transaction.get("destination_wallet_id", ""))
 
-        # Enrichir la transaction avec les infos contextuelles
-        transaction_with_context = {
-            **transaction,
-            "_wallet_balance": wallet_info.get("balance"),
-            "_wallet_status": wallet_info.get("status"),
-            "_user_status": user_profile.get("status"),
-            "_user_risk_level": user_profile.get("risk_level"),
+        # Calculer l'âge du compte (account_age_minutes)
+        account_age_minutes = None
+        try:
+            from dateutil import parser
+            from dateutil.tz import UTC
+
+            tx_time = parser.parse(transaction["created_at"])
+            if tx_time.tzinfo is None:
+                tx_time = tx_time.replace(tzinfo=UTC)
+            else:
+                tx_time = tx_time.astimezone(UTC)
+
+            wallet_created_str = wallet_info.get("created_at")
+            if wallet_created_str:
+                wallet_created = parser.parse(wallet_created_str)
+                if wallet_created.tzinfo is None:
+                    wallet_created = wallet_created.replace(tzinfo=UTC)
+                else:
+                    wallet_created = wallet_created.astimezone(UTC)
+
+                delta = tx_time - wallet_created
+                account_age_minutes = delta.total_seconds() / 60
+        except Exception:
+            pass
+
+        # Préparer le context pour les règles
+        context = {
+            "wallet_info": wallet_info,
+            "user_profile": user_profile,
+            "destination_wallet_info": destination_wallet_info,
+            "account_age_minutes": account_age_minutes,
         }
 
         rules_output = rules_engine.evaluate(
-            transaction=transaction_with_context,
+            transaction=transaction,
             features=features,
+            context=context,
         )
 
         print(f"   ✅ Décision règles: {rules_output.decision}")
@@ -206,14 +245,15 @@ def main():
 
         # Si BLOCK, arrêter ici
         if rules_output.decision == "BLOCK":
-            print("\n🚫 TRANSACTION BLOQUÉE par les règles")
+            print(f"\n🚫 TRANSACTION BLOQUÉE par les règles (tx_id: {tx_id})")
             decision = decision_engine.decide(
                 risk_score=rules_output.rule_score,
                 reasons=rules_output.reasons,
                 hard_block=True,
                 model_version="v1.0.0",
             )
-            print(f"\n📊 Résultat final:")
+            print(f"\n📊 Résultat final (tx_id: {tx_id}):")
+            print(f"   Transaction ID: {tx_id}")
             print(f"   Risk score: {decision.risk_score:.3f}")
             print(f"   Decision: {decision.decision}")
             print(f"   Reasons: {', '.join(decision.reasons)}")
@@ -227,7 +267,7 @@ def main():
             sys.exit(0)
 
         # 3. Scoring ML (mock pour l'instant - à implémenter)
-        print("\n🤖 Scoring ML...")
+        print(f"\n🤖 Scoring ML (tx_id: {tx_id})...")
         # TODO: Implémenter le scoring supervisé et non supervisé
         supervised_score = 0.5  # Mock
         unsupervised_score = 0.5  # Mock
@@ -235,7 +275,7 @@ def main():
         print(f"   ✅ Non supervisé: {unsupervised_score:.3f}")
 
         # 4. Score global
-        print("\n🎯 Calcul du score global...")
+        print(f"\n🎯 Calcul du score global (tx_id: {tx_id})...")
         risk_score = scorer.compute_score(
             rule_score=rules_output.rule_score,
             supervised_score=supervised_score,
@@ -245,7 +285,7 @@ def main():
         print(f"   ✅ Risk score: {risk_score:.3f}")
 
         # 5. Décision finale
-        print("\n⚖️  Décision finale...")
+        print(f"\n⚖️  Décision finale (tx_id: {tx_id})...")
         decision = decision_engine.decide(
             risk_score=risk_score,
             reasons=rules_output.reasons,
@@ -254,7 +294,8 @@ def main():
         )
 
         # Afficher le résultat
-        print(f"\n📊 Résultat final:")
+        print(f"\n📊 Résultat final (tx_id: {tx_id}):")
+        print(f"   Transaction ID: {tx_id}")
         print(f"   Risk score: {decision.risk_score:.3f}")
         print(f"   Decision: {decision.decision}")
         print(f"   Reasons: {', '.join(decision.reasons) if decision.reasons else 'Aucune'}")
