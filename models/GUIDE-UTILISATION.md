@@ -45,11 +45,38 @@ python3 scripts/score_transaction.py --help
 
 ## 2. Commandes de base
 
-### 2.1 Créer une transaction
+### 2.1 Format de transaction
 
-#### Option A : Depuis un fichier JSON
+Le système supporte deux formats :
 
-**Format minimal d'une transaction** :
+#### Format enrichi (recommandé - production)
+
+Format avec features pré-calculées côté backend :
+
+```json
+{
+  "schema_version": "1.0.0",
+  "transaction": {
+    "transaction_id": "tx_001",
+    "amount": 150.0,
+    ...
+  },
+  "context": {
+    "source_wallet": { ... },
+    "user": { ... }
+  },
+  "features": {
+    "transactional": { ... },
+    "historical": { ... }
+  }
+}
+```
+
+Voir `docs/14-transaction-enriched-schema.md` pour la structure complète.
+
+#### Format simple (legacy - dev uniquement)
+
+Format minimal pour développement :
 
 ```json
 {
@@ -64,6 +91,8 @@ python3 scripts/score_transaction.py --help
   "created_at": "2026-01-21T12:00:00Z"
 }
 ```
+
+⚠️ **Note** : Le format simple nécessite `historique_store` et est réservé au développement.
 
 **Champs optionnels** :
 - `country` : Code pays ISO (ex: "FR", "KP")
@@ -122,10 +151,18 @@ Le script vous demandera de saisir :
 
 ### 2.2 Scorer une transaction
 
-#### Option A : Depuis un fichier JSON
+Le script détecte automatiquement le format (enrichi ou simple).
+
+#### Option A : Transaction enrichie (recommandé)
 
 ```bash
-python3 scripts/score_transaction.py ma_transaction.json
+python3 scripts/score_transaction.py tests/fixtures/enriched_transaction_example.json
+```
+
+#### Option B : Transaction simple (legacy - dev uniquement)
+
+```bash
+python3 scripts/score_transaction.py tests/fixtures/test_normal.json
 ```
 
 **Résultat attendu** :
@@ -178,10 +215,10 @@ python3 scripts/test_flow.py
 ```
 
 Ce script teste automatiquement :
-- ✅ Ajout d'une transaction
-- ✅ Visualisation de l'historique
-- ✅ Scoring d'une transaction
-- ✅ Test des règles bloquantes (R1, R2, R4, R5, R6)
+- ✅ Scoring d'une transaction enrichie normale
+- ✅ Test des règles bloquantes (R1)
+- ✅ Test des règles boost (R13)
+- ✅ Test du cas 0 transaction historique
 
 ---
 

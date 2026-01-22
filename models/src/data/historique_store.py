@@ -1,8 +1,27 @@
 """
 Stockage et récupération de l'historique des transactions.
 
-Ce module gère le stockage local des transactions pour la phase de développement.
-En production, ce sera remplacé par une base de données ou un feature store.
+⚠️  LEGACY / DEV ONLY ⚠️
+Ce module est conservé pour la phase de développement uniquement.
+
+**En production** :
+- ❌ Ce fichier n'est PAS utilisé
+- ✅ Les features historiques sont pré-calculées côté backend
+- ✅ Les features sont incluses dans la transaction enrichie
+- ✅ Le ML Engine est stateless (pas de stockage local)
+
+**En développement** :
+- ✅ Utile pour tester localement sans backend
+- ✅ Permet de valider le pipeline de features
+- ✅ Utile pour créer des données de test
+
+**Gestion de la concurrence en production** :
+- Cloud Run gère automatiquement le scaling (plusieurs instances)
+- Chaque instance peut traiter plusieurs requêtes simultanément
+- Pas besoin de batch : chaque transaction est traitée individuellement
+- Pas de race condition : chaque transaction a son propre snapshot d'historique
+
+Voir `docs/17-production-architecture.md` pour plus de détails.
 """
 
 from __future__ import annotations

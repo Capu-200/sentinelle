@@ -1,7 +1,8 @@
 """
 Pipeline complet de feature engineering.
 
-Ce module orchestre l'extraction et l'agrégation des features.
+Ce module orchestre l'extraction des features depuis une transaction enrichie
+(format backend) ou depuis une transaction simple (format legacy).
 """
 
 from __future__ import annotations
@@ -10,16 +11,17 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .aggregator import compute_historical_aggregates
-from .extractor import extract_transaction_features
+from .aggregator import extract_historical_features, compute_historical_aggregates
+from .extractor import extract_transactional_features, extract_transaction_features
 
 
 class FeaturePipeline:
     """
     Pipeline de feature engineering pour les transactions.
 
-    Gère l'extraction des features transactionnelles et le calcul
-    des agrégats historiques.
+    Supporte deux formats :
+    1. Transaction enrichie (nouveau format) : extrait les features pré-calculées
+    2. Transaction simple (legacy) : calcule les features (fallback)
     """
 
     def __init__(
@@ -32,7 +34,7 @@ class FeaturePipeline:
 
         Args:
             feature_schema_path: Chemin vers le schéma de features versionné
-            windows: Liste des fenêtres temporelles à utiliser
+            windows: Liste des fenêtres temporelles à utiliser (legacy uniquement)
         """
         self.windows = windows or ["5m", "1h", "24h", "7d", "30d"]
         self.feature_schema = None
@@ -53,29 +55,82 @@ class FeaturePipeline:
         """
         Transforme une transaction en features.
 
+        Détecte automatiquement le format :
+        - Transaction enrichie : si `transaction.get("features")` existe
+        - Transaction simple : sinon (legacy)
+
         Args:
-            transaction: Transaction à transformer
-            historical_data: Historique des transactions (optionnel)
+            transaction: Transaction à transformer (enrichie ou simple)
+            historical_data: Historique des transactions (legacy uniquement)
 
         Returns:
             Dictionnaire de features complètes
         """
-        # Features transactionnelles
-        tx_features = extract_transaction_features(transaction)
+        # Détecter le format : transaction enrichie ou simple ?
+        is_enriched = "features" in transaction
 
-        # Agrégats historiques
-        historical_features = compute_historical_aggregates(
-            transaction, historical_data, self.windows
-        )
+        if is_enriched:
+            # Format enrichi : extraire les features pré-calculées
+            tx_features = extract_transactional_features(transaction)
+            historical_features = extract_historical_features(transaction)
+        else:
+            # Format legacy : calculer les features
+            tx_features = extract_transaction_features(transaction)
+            historical_features = compute_historical_aggregates(
+                transaction, historical_data, self.windows
+            )
 
         # Combiner toutes les features
         all_features = {**tx_features, **historical_features}
+
+        # Gérer les valeurs null dans les features historiques
+        # (cas 0 transaction historique)
+        all_features = self._handle_null_features(all_features)
 
         # TODO: Valider contre le schéma si présent
         # if self.feature_schema:
         #     self._validate_features(all_features)
 
         return all_features
+
+    def _handle_null_features(self, features: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Gère les valeurs null dans les features historiques.
+
+        Convertit les null en valeurs par défaut :
+        - number null → 0.0
+        - integer null → 0
+        - boolean null → False
+        - array null → []
+
+        Args:
+            features: Dictionnaire de features
+
+        Returns:
+            Dictionnaire avec null remplacés par valeurs par défaut
+        """
+        handled_features = features.copy()
+
+        for key, value in handled_features.items():
+            if value is None:
+                # Déterminer le type attendu depuis le nom de la feature
+                if "count" in key or "tx_last" in key or "blocked" in key:
+                    handled_features[key] = 0
+                elif "amount" in key or "mean" in key or "sum" in key or "max" in key:
+                    handled_features[key] = 0.0
+                elif "is_" in key or "mismatch" in key:
+                    handled_features[key] = False
+                elif "history" in key or "country" in key:
+                    handled_features[key] = []
+                elif "concentration" in key or "ratio" in key or "entropy" in key:
+                    handled_features[key] = 0.0
+                elif "days_since" in key:
+                    handled_features[key] = None  # Garder null pour "jamais"
+                else:
+                    # Par défaut : 0
+                    handled_features[key] = 0
+
+        return handled_features
 
     def fit(self, transactions: List[Dict[str, Any]]) -> None:
         """

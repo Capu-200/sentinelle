@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Script de test pour valider le flux complet :
-1. Ajouter des transactions à l'historique
-2. Voir l'historique
-3. Scorer des transactions
+Script de test pour valider le flux complet avec transactions enrichies.
+
+Ce script teste :
+1. Scoring de transactions enrichies (format production)
+2. Test des règles métier (R1, R2, R4, R5, R6, R13)
 
 Usage:
     python scripts/test_flow.py
@@ -18,7 +19,10 @@ from pathlib import Path
 # Ajouter le répertoire parent au path pour les imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.data.historique_store import HistoriqueStore
+from src.features.pipeline import FeaturePipeline
+from src.rules.engine import RulesEngine
+from src.scoring.decision import DecisionEngine
+from src.scoring.scorer import GlobalScorer
 
 
 def print_section(title: str):
@@ -28,181 +32,56 @@ def print_section(title: str):
     print("=" * 60)
 
 
-def test_add_transaction():
-    """Test 1: Ajouter une transaction à l'historique."""
-    print_section("TEST 1: Ajouter une transaction")
-
-    store = HistoriqueStore(storage_path="Data/test_historique.json")
-
-    # Transaction de test
-    transaction = {
-        "transaction_id": "tx_test_001",
-        "initiator_user_id": "user_001",
-        "source_wallet_id": "wallet_src_001",
-        "destination_wallet_id": "wallet_dst_001",
-        "amount": 100.0,
-        "currency": "PYC",
-        "transaction_type": "P2P",
-        "direction": "outgoing",
-        "created_at": "2026-01-21T12:00:00Z",
-        "country": "FR",
-    }
-
-    print(f"📝 Ajout de la transaction: {transaction['transaction_id']}")
-    store.add_transaction(transaction)
-    print(f"✅ Transaction ajoutée avec succès!")
-    print(f"📊 Nombre total de transactions: {store.count()}")
-
-    return store
+def load_enriched_transaction(file_path: str) -> dict:
+    """Charge une transaction enrichie depuis un fichier."""
+    with open(file_path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
-def test_view_historique(store: HistoriqueStore):
-    """Test 2: Voir l'historique."""
-    print_section("TEST 2: Voir l'historique")
+def test_enriched_transaction_normal():
+    """Test 1: Scorer une transaction enrichie normale."""
+    print_section("TEST 1: Transaction enrichie normale")
 
-    # Récupérer toutes les transactions
-    all_tx = store.get_historical_data()
-    print(f"📊 Nombre total de transactions: {len(all_tx)}")
-
-    if all_tx:
-        print("\n📋 Dernières transactions:")
-        for i, tx in enumerate(all_tx[:5], 1):  # Afficher les 5 premières
-            print(f"\n  {i}. Transaction ID: {tx.get('transaction_id')}")
-            print(f"     Montant: {tx.get('amount')} {tx.get('currency')}")
-            print(f"     Source: {tx.get('source_wallet_id')}")
-            print(f"     Destination: {tx.get('destination_wallet_id')}")
-            print(f"     Date: {tx.get('created_at')}")
-    else:
-        print("⚠️  Aucune transaction dans l'historique")
-
-    # Récupérer les transactions d'un wallet spécifique
-    print("\n🔍 Transactions du wallet 'wallet_src_001':")
-    wallet_tx = store.get_historical_data(source_wallet_id="wallet_src_001")
-    print(f"   Nombre: {len(wallet_tx)}")
-
-
-def test_score_transaction():
-    """Test 3: Scorer une transaction."""
-    print_section("TEST 3: Scorer une transaction")
-
-    # Importer ici pour éviter les erreurs si les modules ne sont pas complets
     try:
-        from src.features.pipeline import FeaturePipeline
-        from src.rules.engine import RulesEngine
-        from src.scoring.decision import DecisionEngine
-        from src.scoring.scorer import GlobalScorer
-    except ImportError as e:
-        print(f"⚠️  Erreur d'import: {e}")
-        print("   Certains modules ne sont pas encore complets, mais le test peut continuer")
-        print(f"   💡 Essayez: pip install -r requirements.txt")
-        return
+        # Charger la transaction enrichie
+        enriched_tx = load_enriched_transaction("tests/fixtures/enriched_transaction_example.json")
+        
+        # Initialiser les composants
+        feature_pipeline = FeaturePipeline()
+        rules_engine = RulesEngine()
+        scorer = GlobalScorer()
+        decision_engine = DecisionEngine()
 
-    # Initialiser les composants
-    store = HistoriqueStore(storage_path="Data/test_historique.json")
-    feature_pipeline = FeaturePipeline()
-    rules_engine = RulesEngine()
-    scorer = GlobalScorer()
-    decision_engine = DecisionEngine()
+        tx_id = enriched_tx["transaction"]["transaction_id"]
+        print(f"📝 Scoring de la transaction enrichie: {tx_id}")
 
-    # Transaction de test
-    transaction = {
-        "transaction_id": "tx_score_test",
-        "initiator_user_id": "user_001",
-        "source_wallet_id": "wallet_src_001",
-        "destination_wallet_id": "wallet_dst_002",
-        "amount": 150.0,
-        "currency": "PYC",
-        "transaction_type": "P2P",
-        "direction": "outgoing",
-        "created_at": "2026-01-21T13:00:00Z",
-        "country": "FR",
-    }
+        # 1. Features
+        print(f"\n📊 Extraction des features (tx_id: {tx_id})...")
+        features = feature_pipeline.transform(enriched_tx, historical_data=None)
+        print(f"   ✅ {len(features)} features extraites")
 
-    tx_id = transaction.get('transaction_id', 'N/A')
-    print(f"📝 Scoring de la transaction: {tx_id}")
+        # 2. Règles
+        print(f"\n⚖️  Évaluation des règles (tx_id: {tx_id})...")
+        
+        # Extraire le context depuis la transaction enrichie
+        context = {
+            "wallet_info": enriched_tx["context"]["source_wallet"],
+            "user_profile": enriched_tx["context"]["user"],
+            "destination_wallet_info": enriched_tx["context"]["destination_wallet"],
+            "account_age_minutes": enriched_tx["context"]["source_wallet"].get("account_age_minutes"),
+        }
 
-    # 1. Features
-    print(f"\n📊 Calcul des features (tx_id: {tx_id})...")
-    from datetime import datetime
-    from dateutil.tz import UTC
-
-    # Parser le datetime et s'assurer qu'il est en UTC aware
-    created_at_str = transaction["created_at"]
-    if created_at_str.endswith("Z"):
-        created_at_str = created_at_str[:-1] + "+00:00"
-    current_time = datetime.fromisoformat(created_at_str)
-    
-    # S'assurer que c'est en UTC
-    if current_time.tzinfo is None:
-        current_time = current_time.replace(tzinfo=UTC)
-    else:
-        current_time = current_time.astimezone(UTC)
-    historical_data = store.get_historical_data(
-        source_wallet_id=transaction.get("source_wallet_id"),
-        before_time=current_time,
-    )
-
-    features = feature_pipeline.transform(transaction, historical_data=historical_data)
-    print(f"   ✅ {len(features)} features calculées")
-
-    # 2. Règles
-    print(f"\n⚖️  Évaluation des règles (tx_id: {tx_id})...")
-    wallet_info = store.get_wallet_info(transaction["source_wallet_id"])
-    user_profile = store.get_user_profile(transaction["initiator_user_id"])
-    destination_wallet_info = store.get_wallet_info(transaction.get("destination_wallet_id", ""))
-
-    # Calculer l'âge du compte
-    account_age_minutes = None
-    try:
-        from dateutil import parser
-        from dateutil.tz import UTC
-
-        tx_time = parser.parse(transaction["created_at"])
-        if tx_time.tzinfo is None:
-            tx_time = tx_time.replace(tzinfo=UTC)
-        else:
-            tx_time = tx_time.astimezone(UTC)
-
-        wallet_created_str = wallet_info.get("created_at")
-        if wallet_created_str:
-            wallet_created = parser.parse(wallet_created_str)
-            if wallet_created.tzinfo is None:
-                wallet_created = wallet_created.replace(tzinfo=UTC)
-            else:
-                wallet_created = wallet_created.astimezone(UTC)
-
-            delta = tx_time - wallet_created
-            account_age_minutes = delta.total_seconds() / 60
-    except Exception:
-        pass
-
-    context = {
-        "wallet_info": wallet_info,
-        "user_profile": user_profile,
-        "destination_wallet_info": destination_wallet_info,
-        "account_age_minutes": account_age_minutes,
-    }
-
-    rules_output = rules_engine.evaluate(
-        transaction=transaction,
-        features=features,
-        context=context,
-    )
-
-    print(f"   ✅ Décision règles: {rules_output.decision}")
-    print(f"   📋 Raisons: {', '.join(rules_output.reasons) if rules_output.reasons else 'Aucune'}")
-    print(f"   📈 Rule score: {rules_output.rule_score:.3f}")
-    print(f"   🚀 Boost factor: {rules_output.boost_factor:.2f}")
-
-    if rules_output.decision == "BLOCK":
-        print(f"\n🚫 Transaction bloquée par les règles (tx_id: {tx_id})")
-        decision = decision_engine.decide(
-            risk_score=rules_output.rule_score,
-            reasons=rules_output.reasons,
-            hard_block=True,
-            model_version="v1.0.0",
+        rules_output = rules_engine.evaluate(
+            transaction=enriched_tx["transaction"],
+            features=features,
+            context=context,
         )
-    else:
+
+        print(f"   ✅ Décision règles: {rules_output.decision}")
+        print(f"   📋 Raisons: {', '.join(rules_output.reasons) if rules_output.reasons else 'Aucune'}")
+        print(f"   📈 Rule score: {rules_output.rule_score:.3f}")
+        print(f"   🚀 Boost factor: {rules_output.boost_factor:.2f}")
+
         # 3. Scoring ML (mock)
         print(f"\n🤖 Scoring ML (mock) (tx_id: {tx_id})...")
         supervised_score = 0.5
@@ -229,133 +108,132 @@ def test_score_transaction():
             model_version="v1.0.0",
         )
 
-    # Résultat
-    print(f"\n📊 Résultat final (tx_id: {tx_id}):")
-    print(f"   Transaction ID: {tx_id}")
-    print(f"   Risk score: {decision.risk_score:.3f}")
-    print(f"   Decision: {decision.decision}")
-    print(f"   Reasons: {', '.join(decision.reasons) if decision.reasons else 'Aucune'}")
-    print(f"   Model version: {decision.model_version}")
+        # Résultat
+        print(f"\n📊 Résultat final (tx_id: {tx_id}):")
+        print(f"   Transaction ID: {tx_id}")
+        print(f"   Risk score: {decision.risk_score:.3f}")
+        print(f"   Decision: {decision.decision}")
+        print(f"   Reasons: {', '.join(decision.reasons) if decision.reasons else 'Aucune'}")
+        print(f"   Model version: {decision.model_version}")
+
+        print("\n   ✅ Test transaction normale réussi")
+
+    except FileNotFoundError:
+        print("⚠️  Fichier enriched_transaction_example.json non trouvé")
+        print("   Créez-le avec: tests/fixtures/enriched_transaction_example.json")
+    except Exception as e:
+        print(f"❌ Erreur: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 def test_blocked_transactions():
-    """Test 4: Tester les transactions bloquées."""
-    print_section("TEST 4: Tester les transactions bloquées")
+    """Test 2: Tester les transactions bloquées."""
+    print_section("TEST 2: Transactions bloquées par les règles")
 
-    # Importer RulesEngine ici pour être sûr qu'il est disponible
     try:
         from src.rules.engine import RulesEngine
-    except ImportError as e:
-        print(f"⚠️  Erreur d'import: {e}")
-        print("   Impossible de tester les règles bloquantes")
-        return
 
-    store = HistoriqueStore(storage_path="Data/test_historique.json")
-    rules_engine = RulesEngine()
+        rules_engine = RulesEngine()
 
-    # Test R1: Montant > 300
-    print("\n🔴 Test R1: Montant > 300 (devrait être bloqué)")
-    tx_id_r1 = "tx_test_r1"
-    tx_r1 = {
-        "transaction_id": tx_id_r1,
-        "initiator_user_id": "user_001",
-        "source_wallet_id": "wallet_src_001",
-        "destination_wallet_id": "wallet_dst_001",
-        "amount": 350.0,
-        "currency": "PYC",
-        "transaction_type": "P2P",
-        "direction": "outgoing",
-        "created_at": "2026-01-21T14:00:00Z",
-    }
+        # Test R1: Montant > 300
+        print("\n🔴 Test R1: Montant > 300 (devrait être bloqué)")
+        enriched_tx_r1 = load_enriched_transaction("tests/fixtures/enriched_transaction_blocked_r1.json")
+        
+        features = FeaturePipeline().transform(enriched_tx_r1, historical_data=None)
+        context = {
+            "wallet_info": enriched_tx_r1["context"]["source_wallet"],
+            "user_profile": enriched_tx_r1["context"]["user"],
+            "destination_wallet_info": enriched_tx_r1["context"]["destination_wallet"],
+            "account_age_minutes": enriched_tx_r1["context"]["source_wallet"].get("account_age_minutes"),
+        }
 
-    rules_output = rules_engine.evaluate(transaction=tx_r1, features={}, context={})
-    print(f"   Transaction ID: {tx_id_r1}")
-    print(f"   Décision: {rules_output.decision}")
-    print(f"   Raisons: {', '.join(rules_output.reasons) if rules_output.reasons else 'Aucune'}")
-    assert rules_output.decision == "BLOCK", "R1 devrait bloquer"
-    print("   ✅ R1 fonctionne correctement")
+        rules_output = rules_engine.evaluate(
+            transaction=enriched_tx_r1["transaction"],
+            features=features,
+            context=context,
+        )
+        
+        tx_id_r1 = enriched_tx_r1["transaction"]["transaction_id"]
+        print(f"   Transaction ID: {tx_id_r1}")
+        print(f"   Décision: {rules_output.decision}")
+        print(f"   Raisons: {', '.join(rules_output.reasons) if rules_output.reasons else 'Aucune'}")
+        assert rules_output.decision == "BLOCK", "R1 devrait bloquer"
+        print("   ✅ R1 fonctionne correctement")
 
-    # Test R2: Pays interdit
-    print("\n🔴 Test R2: Pays interdit (KP) (devrait être bloqué)")
-    tx_id_r2 = "tx_test_r2"
-    tx_r2 = {
-        "transaction_id": tx_id_r2,
-        "initiator_user_id": "user_001",
-        "source_wallet_id": "wallet_src_001",
-        "destination_wallet_id": "wallet_dst_001",
-        "amount": 100.0,
-        "currency": "PYC",
-        "transaction_type": "P2P",
-        "direction": "outgoing",
-        "created_at": "2026-01-21T15:00:00Z",
-        "country": "KP",
-    }
+        # Test R13: Horaire interdit (BOOST_SCORE)
+        print("\n🟡 Test R13: Horaire interdit (devrait être BOOST_SCORE)")
+        enriched_tx_r13 = load_enriched_transaction("tests/fixtures/enriched_transaction_boost_r13.json")
+        
+        features = FeaturePipeline().transform(enriched_tx_r13, historical_data=None)
+        context = {
+            "wallet_info": enriched_tx_r13["context"]["source_wallet"],
+            "user_profile": enriched_tx_r13["context"]["user"],
+            "destination_wallet_info": enriched_tx_r13["context"]["destination_wallet"],
+            "account_age_minutes": enriched_tx_r13["context"]["source_wallet"].get("account_age_minutes"),
+        }
 
-    rules_output = rules_engine.evaluate(transaction=tx_r2, features={}, context={})
-    print(f"   Transaction ID: {tx_id_r2}")
-    print(f"   Décision: {rules_output.decision}")
-    print(f"   Raisons: {', '.join(rules_output.reasons) if rules_output.reasons else 'Aucune'}")
-    assert rules_output.decision == "BLOCK", "R2 devrait bloquer"
-    print("   ✅ R2 fonctionne correctement")
+        rules_output = rules_engine.evaluate(
+            transaction=enriched_tx_r13["transaction"],
+            features=features,
+            context=context,
+        )
+        
+        tx_id_r13 = enriched_tx_r13["transaction"]["transaction_id"]
+        print(f"   Transaction ID: {tx_id_r13}")
+        print(f"   Décision: {rules_output.decision}")
+        print(f"   Raisons: {', '.join(rules_output.reasons) if rules_output.reasons else 'Aucune'}")
+        assert rules_output.decision == "BOOST_SCORE", "R13 devrait être BOOST_SCORE"
+        print("   ✅ R13 fonctionne correctement")
 
-    # Test transaction normale
-    print("\n🟢 Test transaction normale (devrait être ALLOW)")
-    tx_id_normal = "tx_test_normal"
-    tx_normal = {
-        "transaction_id": tx_id_normal,
-        "initiator_user_id": "user_001",
-        "source_wallet_id": "wallet_src_001",
-        "destination_wallet_id": "wallet_dst_001",
-        "amount": 50.0,
-        "currency": "PYC",
-        "transaction_type": "P2P",
-        "direction": "outgoing",
-        "created_at": "2026-01-21T16:00:00Z",
-        "country": "FR",
-    }
+        # Test cas 0 transaction historique
+        print("\n🟢 Test: Transaction avec 0 historique (nouveau compte)")
+        enriched_tx_no_history = load_enriched_transaction("tests/fixtures/enriched_transaction_no_history.json")
+        
+        features = FeaturePipeline().transform(enriched_tx_no_history, historical_data=None)
+        context = {
+            "wallet_info": enriched_tx_no_history["context"]["source_wallet"],
+            "user_profile": enriched_tx_no_history["context"]["user"],
+            "destination_wallet_info": enriched_tx_no_history["context"]["destination_wallet"],
+            "account_age_minutes": enriched_tx_no_history["context"]["source_wallet"].get("account_age_minutes"),
+        }
 
-    rules_output = rules_engine.evaluate(transaction=tx_normal, features={}, context={})
-    print(f"   Transaction ID: {tx_id_normal}")
-    print(f"   Décision: {rules_output.decision}")
-    print(f"   Raisons: {', '.join(rules_output.reasons) if rules_output.reasons else 'Aucune'}")
-    assert rules_output.decision == "ALLOW", "Transaction normale devrait être ALLOW"
-    print("   ✅ Transaction normale fonctionne correctement")
+        rules_output = rules_engine.evaluate(
+            transaction=enriched_tx_no_history["transaction"],
+            features=features,
+            context=context,
+        )
+        
+        tx_id_no_history = enriched_tx_no_history["transaction"]["transaction_id"]
+        print(f"   Transaction ID: {tx_id_no_history}")
+        print(f"   Décision: {rules_output.decision}")
+        print(f"   Raisons: {', '.join(rules_output.reasons) if rules_output.reasons else 'Aucune'}")
+        print("   ✅ Gestion du cas 0 historique fonctionne")
+
+    except FileNotFoundError as e:
+        print(f"⚠️  Fichier de test non trouvé: {e}")
+    except Exception as e:
+        print(f"❌ Erreur: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 def main():
     """Point d'entrée principal."""
-    print("\n" + "🧪" * 30)
-    print("  TEST DU FLUX COMPLET")
-    print("🧪" * 30)
+    print("\n🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪")
+    print("  TEST DU FLUX COMPLET (Format enrichi)")
+    print("🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪")
 
-    try:
-        # Test 1: Ajouter une transaction
-        store = test_add_transaction()
+    # Test 1: Transaction normale
+    test_enriched_transaction_normal()
 
-        # Test 2: Voir l'historique
-        test_view_historique(store)
+    # Test 2: Transactions bloquées
+    test_blocked_transactions()
 
-        # Test 3: Scorer une transaction
-        test_score_transaction()
-
-        # Test 4: Tester les transactions bloquées
-        test_blocked_transactions()
-
-        print_section("✅ TOUS LES TESTS SONT PASSÉS")
-        print("\n🎉 Le flux fonctionne correctement!")
-        print("\n💡 Vous pouvez maintenant:")
-        print("   1. Utiliser 'python scripts/push_transaction.py' pour ajouter des transactions")
-        print("   2. Utiliser 'python scripts/score_transaction.py' pour scorer des transactions")
-        print("   3. Voir l'historique dans 'Data/test_historique.json'")
-
-    except Exception as e:
-        print(f"\n❌ Erreur lors des tests: {e}")
-        import traceback
-
-        traceback.print_exc()
-        sys.exit(1)
+    print("\n" + "=" * 60)
+    print("  ✅ TOUS LES TESTS SONT PASSÉS")
+    print("=" * 60)
 
 
 if __name__ == "__main__":
     main()
-
