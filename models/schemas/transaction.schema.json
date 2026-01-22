@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://payon.local/schemas/transaction.schema.json",
+  "title": "Transaction",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "transaction_id",
+    "initiator_user_id",
+    "source_wallet_id",
+    "destination_wallet_id",
+    "amount",
+    "currency",
+    "transaction_type",
+    "direction",
+    "created_at"
+  ],
+  "properties": {
+    "transaction_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provider_tx_id": {
+      "type": ["string", "null"]
+    },
+    "initiator_user_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_wallet_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "destination_wallet_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "amount": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "currency": {
+      "type": "string",
+      "enum": ["PYC"]
+    },
+    "transaction_type": {
+      "type": "string",
+      "enum": ["P2P", "MERCHANT", "CASHIN", "CASHOUT"]
+    },
+    "direction": {
+      "type": "string",
+      "enum": ["outgoing", "incoming"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["PENDING", "SUCCESS", "FAILED", "CANCELED"]
+    },
+    "reason_code": {
+      "type": ["string", "null"]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "provider_created_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "executed_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "country": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 2
+    },
+    "city": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "raw_provider_payload": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}
+

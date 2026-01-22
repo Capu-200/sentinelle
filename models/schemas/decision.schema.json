@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://payon.local/schemas/decision.schema.json",
+  "title": "FraudDecision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["risk_score", "decision", "reasons", "model_version"],
+  "properties": {
+    "risk_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["APPROVE", "REVIEW", "BLOCK"]
+    },
+    "reasons": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "model_version": {
+      "type": "string",
+      "pattern": "^v\\d+\\.\\d+\\.\\d+([.-][0-9A-Za-z]+)*$"
+    },
+    "rule_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "s_sup": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "s_unsup": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  }
+}
+
