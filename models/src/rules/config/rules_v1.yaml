@@ -1,0 +1,62 @@
+# Configuration des règles métier v1
+
+rules:
+  R1:
+    name: "KYC light - Montant max"
+    description: "Bloque les transactions dépassant le plafond KYC light"
+    condition:
+      field: "amount"
+      operator: ">"
+      threshold: 300
+    action:
+      type: "HARD_BLOCK"
+      reason: "amount_over_kyc_limit"
+    contribution: 1.0
+
+  R2:
+    name: "Pays interdit/sanctionné"
+    description: "Bloque les transactions provenant de pays interdits"
+    condition:
+      field: "country"
+      operator: "in"
+      values: ["KP"]  # Corée du Nord (exemple)
+    action:
+      type: "HARD_BLOCK"
+      reason: "sanctioned_country"
+    contribution: 1.0
+
+  R3:
+    name: "Vélocité anormale"
+    description: "Détecte un comportement de spam/exfiltration"
+    condition:
+      type: "historical"
+      checks:
+        - field: "src_tx_count_out_1m"
+          operator: ">"
+          threshold: 5
+        - field: "src_tx_count_out_1h"
+          operator: ">"
+          threshold: 30
+      logic: "OR"
+    action:
+      type: "REVIEW"
+      reason: "high_velocity"
+    contribution: 0.6
+
+  R4:
+    name: "Nouveau destinataire + montant inhabituel"
+    description: "Nouveau bénéficiaire + montant au-dessus de l'habitude"
+    condition:
+      type: "historical"
+      checks:
+        - field: "is_new_destination_30d"
+          operator: "=="
+          value: true
+        - field: "amount"
+          operator: ">"
+          reference: "p95_amount_source_30d"
+      logic: "AND"
+    action:
+      type: "REVIEW"
+      reason: "new_destination_wallet"
+    contribution: 0.6
