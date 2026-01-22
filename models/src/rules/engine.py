@@ -31,6 +31,8 @@ class RulesOutput:
     rule_score: float
     reasons: List[str]
     hard_block: bool
+    decision: str  # ALLOW, BOOST_SCORE, BLOCK
+    boost_factor: float  # Facteur de boost (défaut: 1.0)
 
 
 class RulesEngine:
@@ -100,10 +102,27 @@ class RulesEngine:
         reasons = [r.reason for r in results if r.triggered and r.reason]
         hard_block = any(r.hard_block for r in results)
 
+        # Déterminer la décision et le boost_factor
+        if hard_block:
+            decision = "BLOCK"
+            boost_factor = 1.0
+        else:
+            # Compter les règles BOOST_SCORE déclenchées
+            boost_rules_count = sum(1 for r in results if r.triggered and not r.hard_block)
+            if boost_rules_count > 0:
+                decision = "BOOST_SCORE"
+                # Calculer le boost_factor (ex: +0.1 par règle, max 2.0)
+                boost_factor = min(2.0, 1.0 + (boost_rules_count * 0.1))
+            else:
+                decision = "ALLOW"
+                boost_factor = 1.0
+
         return RulesOutput(
             rule_score=rule_score,
             reasons=reasons,
             hard_block=hard_block,
+            decision=decision,
+            boost_factor=boost_factor,
         )
 
     def _evaluate_r1(self, transaction: Dict[str, Any]) -> RuleResult:

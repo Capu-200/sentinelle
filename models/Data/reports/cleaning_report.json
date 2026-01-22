@@ -1,0 +1,20 @@
+{
+  "data_dir": "/Users/kclo/Documents/2025/SCHOOL PROJECT/sentinelle/models/Data",
+  "raw_dir": "/Users/kclo/Documents/2025/SCHOOL PROJECT/sentinelle/models/Data/raw",
+  "out_dir": "/Users/kclo/Documents/2025/SCHOOL PROJECT/sentinelle/models/Data/processed",
+  "report_dir": "/Users/kclo/Documents/2025/SCHOOL PROJECT/sentinelle/models/Data/reports",
+  "datasets": [
+    {
+      "name": "payon_legit_no_status",
+      "input_path": "/Users/kclo/Documents/2025/SCHOOL PROJECT/sentinelle/models/Data/raw/dataset_legit_no_status.csv",
+      "rows_in": 300000,
+      "rows_out": 300000,
+      "duplicates_dropped": 0,
+      "missing_core_dropped": 0,
+      "invalid_created_at": 0,
+      "unknown_direction": 0,
+      "metadata_parse_failed": 0,
+      "metadata_had_risk_score": 0
+    }
+  ]
+}
