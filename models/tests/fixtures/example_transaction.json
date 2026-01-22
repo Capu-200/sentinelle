@@ -1,0 +1,15 @@
+{
+  "transaction_id": "tx_example_001",
+  "initiator_user_id": "user_123",
+  "source_wallet_id": "wallet_src_456",
+  "destination_wallet_id": "wallet_dst_789",
+  "amount": 150.0,
+  "currency": "PYC",
+  "transaction_type": "P2P",
+  "direction": "outgoing",
+  "created_at": "2026-01-21T12:00:00Z",
+  "country": "FR",
+  "city": "Paris",
+  "description": "Paiement test"
+}
+

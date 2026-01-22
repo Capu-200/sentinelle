@@ -48,6 +48,7 @@ class GlobalScorer:
         rule_score: float,
         supervised_score: float,
         unsupervised_score: float,
+        boost_factor: float = 1.0,
     ) -> float:
         """
         Calcule le score global de risque.
@@ -56,6 +57,7 @@ class GlobalScorer:
             rule_score: Score des règles [0,1]
             supervised_score: Score du modèle supervisé [0,1]
             unsupervised_score: Score du modèle non supervisé [0,1]
+            boost_factor: Facteur de boost à appliquer (défaut: 1.0)
 
         Returns:
             Score global de risque [0,1]
@@ -65,6 +67,9 @@ class GlobalScorer:
             + self.weights["supervised"] * supervised_score
             + self.weights["unsupervised"] * unsupervised_score
         )
+
+        # Appliquer le boost_factor
+        risk_score = risk_score * boost_factor
 
         # Clamper entre 0 et 1
         return max(0.0, min(1.0, risk_score))

@@ -1,4 +1,4 @@
-# 03 — Règles métier (R1 → R4)
+# 03 — Règles métier
 
 ## Objectif
 
@@ -8,10 +8,16 @@ Chaque règle peut :
 
 - ajouter un `reason` (id stable)
 - contribuer à un `rule_score` ∈ \[0,1\]
-- parfois forcer une décision (`BLOCK`) si c’est un cas “hard” (ex: contrainte KYC light, pays interdit)
+- parfois forcer une décision (`BLOCK`) si c'est un cas "hard" (ex: contrainte KYC light, pays interdit)
+- appliquer un `BOOST_SCORE` pour augmenter le risque sans bloquer
 
-> Les règles définitives R1→R4 seront fournies par le projet.  
-> En attendant, cette page propose un set **simple et logique** (v1) qui colle à tes exemples.
+## Documentation
+
+- **Règles détaillées** : Voir `03-rules-detailed.md` pour la liste complète des règles (R1-R15)
+- **Questions de clarification** : Voir `03-rules-questions.md` pour les points à clarifier avant implémentation
+
+> Les règles détaillées R1→R15 sont définies dans `03-rules-detailed.md`.  
+> Cette page conserve les règles initiales R1→R4 comme référence historique.
 
 ## Convention “reasons”
 

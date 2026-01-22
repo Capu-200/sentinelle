@@ -1,0 +1,14 @@
+{
+  "transaction_id": "tx_blocked_r2",
+  "initiator_user_id": "user_001",
+  "source_wallet_id": "wallet_src_001",
+  "destination_wallet_id": "wallet_dst_001",
+  "amount": 100.0,
+  "currency": "PYC",
+  "transaction_type": "P2P",
+  "direction": "outgoing",
+  "created_at": "2026-01-21T12:00:00Z",
+  "country": "KP",
+  "description": "Transaction bloquée par R2 (pays interdit)"
+}
+

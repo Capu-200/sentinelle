@@ -28,7 +28,9 @@ models/
 ├── scripts/                      # Scripts d'entraînement et évaluation
 │   ├── train.py                  # Pipeline d'entraînement complet
 │   ├── evaluate.py              # Évaluation des modèles
-│   └── clean_data.py             # Nettoyage des données (autonome)
+│   ├── clean_data.py             # Nettoyage des données (autonome)
+│   ├── push_transaction.py       # Ajouter une transaction à l'historique
+│   └── score_transaction.py      # Scorer une transaction (pipeline complet)
 │
 ├── tests/                        # Tests unitaires et d'intégration
 │   └── fixtures/                 # Données de test
@@ -46,10 +48,12 @@ models/
 
 - `cleaning.py` : Logique de nettoyage réutilisable (normalisation, parsing, anti-leakage)
 - `preparation.py` : Pipeline de préparation pour l'entraînement (split temporel, validation)
+- `historique_store.py` : Stockage et récupération de l'historique des transactions (phase dev - fichier local)
 
 **Utilisé par** :
 - Scripts d'entraînement (`scripts/train.py`)
 - Pipeline de feature engineering
+- Scripts de scoring (`scripts/score_transaction.py`)
 
 ### 2. `src/features/` — Feature Engineering
 
@@ -85,6 +89,8 @@ models/
 - `rule_score` ∈ [0,1]
 - `reasons` : liste d'identifiants de règles déclenchées
 - `hard_block` : booléen (force BLOCK)
+- `decision` : `ALLOW`, `BOOST_SCORE`, ou `BLOCK`
+- `boost_factor` : facteur de boost à appliquer au score final (défaut: 1.0)
 
 ### 4. `src/models/` — Modèles ML
 
@@ -115,8 +121,9 @@ models/
 **Responsabilité** : Combinaison des signaux et prise de décision finale.
 
 - `scorer.py` : Calcul du score global
-  - Formule : `risk_score = 0.2 × rule_score + 0.6 × s_sup + 0.2 × s_unsup`
+  - Formule : `risk_score = (0.2 × rule_score + 0.6 × s_sup + 0.2 × s_unsup) × boost_factor`
   - Poids configurables via `configs/scoring_config.yaml`
+  - `boost_factor` transmis depuis les règles métier
 - `decision.py` : Logique de décision (BLOCK/REVIEW/APPROVE)
   - Seuils configurables (top 0.1% BLOCK, top 1% REVIEW)
   - Gestion des hard blocks (règles R1/R2)
@@ -199,15 +206,28 @@ Les schémas de features sont versionnés dans `src/features/schemas/v1.json` (e
 ## Flux d'inference (scoring)
 
 1. **Transaction en entrée** : JSON conforme à `schemas/transaction.schema.json`
-2. **Feature Engineering** : `src/features/pipeline.py` → Features enrichies
-3. **Règles métier** : `src/rules/engine.py` → `rule_score` + `reasons`
-4. **Scoring supervisé** : `src/models/supervised/predictor.py` → `s_sup`
-5. **Scoring non supervisé** : `src/models/unsupervised/predictor.py` → `s_unsup`
-6. **Score global** : `src/scoring/scorer.py` → `risk_score`
-7. **Décision** : `src/scoring/decision.py` → `decision` (BLOCK/REVIEW/APPROVE)
-8. **Sortie** : JSON conforme à `schemas/decision.schema.json`
+2. **Récupération historique** : `src/data/historique_store.py` → Historique des transactions
+3. **Feature Engineering** : `src/features/pipeline.py` → Features enrichies (avec historique)
+4. **Règles métier** : `src/rules/engine.py` → `rule_score` + `reasons` + `boost_factor` + `decision`
+   - Si `decision = BLOCK` → arrêt immédiat, pas de passage par l'IA
+   - Si `decision = BOOST_SCORE` → `boost_factor > 1.0` appliqué au score final
+   - Si `decision = ALLOW` → passage normal à l'IA
+5. **Scoring supervisé** : `src/models/supervised/predictor.py` → `s_sup` (si pas BLOCK)
+6. **Scoring non supervisé** : `src/models/unsupervised/predictor.py` → `s_unsup` (si pas BLOCK)
+7. **Score global** : `src/scoring/scorer.py` → `risk_score = (formule) × boost_factor`
+8. **Décision** : `src/scoring/decision.py` → `decision` (BLOCK/REVIEW/APPROVE)
+9. **Sortie** : JSON conforme à `schemas/decision.schema.json`
+
+**Script principal** : `scripts/score_transaction.py` (orchestre tout le pipeline)
 
 **Contrainte** : Latence < 300ms (p95)
+
+### Stockage d'historique (phase dev)
+
+Pour la phase de développement, l'historique est stocké dans `Data/historique.json` :
+- **Ajouter une transaction** : `python scripts/push_transaction.py <transaction.json>`
+- **Scorer une transaction** : `python scripts/score_transaction.py <transaction.json> --save`
+- L'historique est utilisé pour calculer les features comportementales et certaines règles
 
 ## Tests
 
