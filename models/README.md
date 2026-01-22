@@ -29,8 +29,13 @@ Exemple :
 }
 ```
 
+## Architecture
+
+- `docs/00-architecture.md` — **Architecture du projet** (structure, modules, flux)
+
 ## Documentation (source de vérité)
 
+- `docs/00-architecture.md` — **Architecture du projet** (structure, modules, flux)
 - `docs/01-requirements-and-decisions.md` — périmètre, contraintes, hypothèses v1
 - `docs/02-api-contract.md` — contrat JSON (entrée / sortie) + exemples
 - `docs/03-rules.md` — règles R1→R4 (v1 proposées, à ajuster)

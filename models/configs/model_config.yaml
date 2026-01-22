@@ -1,0 +1,30 @@
+# Configuration des modèles ML
+
+supervised:
+  model_type: "lightgbm"
+  hyperparameters:
+    n_estimators: 100
+    max_depth: 7
+    learning_rate: 0.1
+    num_leaves: 31
+    min_child_samples: 20
+    subsample: 0.8
+    colsample_bytree: 0.8
+    scale_pos_weight: null  # Calculé automatiquement selon déséquilibre
+  metrics:
+    primary: "pr_auc"
+    validation: ["pr_auc", "precision", "recall"]
+  early_stopping:
+    rounds: 10
+    metric: "pr_auc"
+
+unsupervised:
+  model_type: "isolation_forest"
+  hyperparameters:
+    n_estimators: 100
+    max_samples: "auto"
+    contamination: 0.01
+    random_state: 42
+  calibration:
+    method: "quantile"
+    reference_quantiles: [0.0, 0.25, 0.5, 0.75, 1.0]

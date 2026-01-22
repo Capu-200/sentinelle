@@ -1,0 +1,31 @@
+{
+  "version": "1.0.0",
+  "description": "Schéma de features v1.0.0",
+  "features": {
+    "transaction_features": {
+      "amount": "float",
+      "log_amount": "float",
+      "currency_is_pyc": "bool",
+      "direction_outgoing": "bool",
+      "direction_incoming": "bool",
+      "transaction_type_p2p": "bool",
+      "hour_of_day": "int",
+      "day_of_week": "int"
+    },
+    "historical_features": {
+      "src_tx_count_out_5m": "int",
+      "src_tx_count_out_1h": "int",
+      "src_tx_count_out_24h": "int",
+      "src_tx_count_out_7d": "int",
+      "src_tx_amount_sum_out_1h": "float",
+      "src_tx_amount_mean_out_1h": "float",
+      "src_tx_amount_max_out_1h": "float",
+      "src_unique_destinations_24h": "int",
+      "is_new_destination_24h": "bool",
+      "is_new_destination_7d": "bool",
+      "is_new_destination_30d": "bool",
+      "src_to_dst_tx_count_30d": "int"
+    }
+  },
+  "notes": "Ce schéma sera étendu avec toutes les features définies dans docs/04-feature-engineering.md"
+}

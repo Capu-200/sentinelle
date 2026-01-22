@@ -1,0 +1,49 @@
+# Configuration des features
+
+# Fenêtres temporelles
+windows:
+  - "5m"   # 5 minutes
+  - "1h"   # 1 heure
+  - "24h"  # 24 heures
+  - "7d"   # 7 jours
+  - "30d"  # 30 jours
+
+# Clés d'agrégation (entités pour calculer les agrégats)
+aggregation_keys:
+  - "source_wallet_id"
+  - "destination_wallet_id"
+  - "initiator_user_id"
+  - "source_destination_pair"  # (source_wallet_id, destination_wallet_id)
+
+# Features transactionnelles à extraire
+transaction_features:
+  - "amount"
+  - "log_amount"
+  - "currency_is_pyc"
+  - "direction"
+  - "transaction_type"
+  - "hour_of_day"
+  - "day_of_week"
+  - "country"
+
+# Agrégats historiques à calculer
+historical_aggregates:
+  wallet_source:
+    - "tx_count_out"
+    - "tx_amount_sum_out"
+    - "tx_amount_mean_out"
+    - "tx_amount_max_out"
+    - "unique_destinations"
+  relation:
+    - "is_new_destination"
+    - "tx_count"
+    - "days_since_last"
+  dispersion:
+    - "destination_concentration"
+    - "destination_entropy"
+  location:
+    - "is_new_country"
+    - "country_mismatch"
+  status:
+    - "failed_count"
+    - "failed_ratio"

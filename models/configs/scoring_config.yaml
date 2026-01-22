@@ -1,0 +1,17 @@
+# Configuration du scoring global
+
+# Poids de la formule globale
+weights:
+  rule_score: 0.2
+  supervised: 0.6
+  unsupervised: 0.2
+
+# Seuils de décision (quantiles sur validation set)
+thresholds:
+  block: 0.999  # Top 0.1% (quantile 0.999)
+  review: 0.99   # Top 1% (quantile 0.99)
+
+# Politique de hard blocks
+hard_blocks:
+  enabled: true
+  rules: ["R1", "R2"]  # Règles qui forcent BLOCK

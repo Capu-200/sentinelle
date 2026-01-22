@@ -64,3 +64,9 @@ logs/
 models/Data/raw/
 models/Data/processed/
 *.csv
+
+# ML Artifacts - modèles entraînés et artefacts versionnés
+models/artifacts/*
+!models/artifacts/.gitkeep
+!models/artifacts/latest
+models/artifacts/v*/
