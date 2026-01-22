@@ -205,29 +205,32 @@ Les schémas de features sont versionnés dans `src/features/schemas/v1.json` (e
 
 ## Flux d'inference (scoring)
 
-1. **Transaction en entrée** : JSON conforme à `schemas/transaction.schema.json`
-2. **Récupération historique** : `src/data/historique_store.py` → Historique des transactions
-3. **Feature Engineering** : `src/features/pipeline.py` → Features enrichies (avec historique)
-4. **Règles métier** : `src/rules/engine.py` → `rule_score` + `reasons` + `boost_factor` + `decision`
+### Format enrichi (production)
+
+1. **Transaction enrichie en entrée** : JSON conforme à `schemas/enriched_transaction.schema.json`
+   - Contient `transaction`, `context`, et `features` pré-calculées
+2. **Feature Engineering** : `src/features/pipeline.py` → Extraction des features pré-calculées
+3. **Règles métier** : `src/rules/engine.py` → `rule_score` + `reasons` + `boost_factor` + `decision`
    - Si `decision = BLOCK` → arrêt immédiat, pas de passage par l'IA
    - Si `decision = BOOST_SCORE` → `boost_factor > 1.0` appliqué au score final
    - Si `decision = ALLOW` → passage normal à l'IA
-5. **Scoring supervisé** : `src/models/supervised/predictor.py` → `s_sup` (si pas BLOCK)
-6. **Scoring non supervisé** : `src/models/unsupervised/predictor.py` → `s_unsup` (si pas BLOCK)
-7. **Score global** : `src/scoring/scorer.py` → `risk_score = (formule) × boost_factor`
-8. **Décision** : `src/scoring/decision.py` → `decision` (BLOCK/REVIEW/APPROVE)
-9. **Sortie** : JSON conforme à `schemas/decision.schema.json`
+4. **Scoring supervisé** : `src/models/supervised/predictor.py` → `s_sup` (si pas BLOCK)
+5. **Scoring non supervisé** : `src/models/unsupervised/predictor.py` → `s_unsup` (si pas BLOCK)
+6. **Score global** : `src/scoring/scorer.py` → `risk_score = (formule) × boost_factor`
+7. **Décision** : `src/scoring/decision.py` → `decision` (BLOCK/REVIEW/APPROVE)
+8. **Sortie** : JSON conforme à `schemas/decision.schema.json`
 
 **Script principal** : `scripts/score_transaction.py` (orchestre tout le pipeline)
 
 **Contrainte** : Latence < 300ms (p95)
 
-### Stockage d'historique (phase dev)
+### Format legacy (dev uniquement)
 
-Pour la phase de développement, l'historique est stocké dans `Data/historique.json` :
-- **Ajouter une transaction** : `python scripts/push_transaction.py <transaction.json>`
-- **Scorer une transaction** : `python scripts/score_transaction.py <transaction.json> --save`
-- L'historique est utilisé pour calculer les features comportementales et certaines règles
+⚠️ **Note** : Le format legacy est conservé pour le développement mais ne doit pas être utilisé en production.
+
+Pour la phase de développement, l'historique peut être stocké dans `Data/historique.json` :
+- **Ajouter une transaction** : `python scripts/push_transaction.py <transaction.json>` (legacy)
+- **Scorer une transaction** : `python scripts/score_transaction.py <transaction.json>` (détection auto)
 
 ## Tests
 

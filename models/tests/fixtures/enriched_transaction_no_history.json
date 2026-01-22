@@ -1,0 +1,87 @@
+{
+  "schema_version": "1.0.0",
+  "transaction": {
+    "transaction_id": "tx_new_account",
+    "provider": "wallet_provider_1",
+    "provider_tx_id": null,
+    "initiator_user_id": "user_new",
+    "source_wallet_id": "wallet_new",
+    "destination_wallet_id": "wallet_dst_001",
+    "amount": 50.0,
+    "currency": "PYC",
+    "transaction_type": "P2P",
+    "direction": "outgoing",
+    "status": "PENDING",
+    "reason_code": null,
+    "created_at": "2026-01-21T12:00:00Z",
+    "provider_created_at": null,
+    "executed_at": null,
+    "country": "FR",
+    "city": null,
+    "description": "Première transaction",
+    "metadata": null
+  },
+  "context": {
+    "source_wallet": {
+      "wallet_id": "wallet_new",
+      "balance": 1000.0,
+      "status": "active",
+      "created_at": "2026-01-21T11:00:00Z",
+      "account_age_minutes": 60.0
+    },
+    "destination_wallet": {
+      "wallet_id": "wallet_dst_001",
+      "status": "active"
+    },
+    "user": {
+      "user_id": "user_new",
+      "status": "active",
+      "risk_level": "low"
+    }
+  },
+  "features": {
+    "transactional": {
+      "amount": 50.0,
+      "log_amount": 3.9318256327243257,
+      "currency_is_pyc": true,
+      "direction_outgoing": 1,
+      "direction_incoming": 0,
+      "transaction_type_p2p": 1,
+      "transaction_type_merchant": 0,
+      "transaction_type_cashin": 0,
+      "transaction_type_cashout": 0,
+      "hour_of_day": 12,
+      "day_of_week": 2,
+      "country_fr": 1,
+      "country_be": 0,
+      "country_kp": 0
+    },
+    "historical": {
+      "avg_amount_30d": null,
+      "tx_last_10min": null,
+      "is_new_beneficiary": null,
+      "user_country_history": null,
+      "blocked_tx_last_24h": null,
+      "src_tx_count_out_5m": null,
+      "src_tx_count_out_1h": null,
+      "src_tx_count_out_24h": null,
+      "src_tx_count_out_7d": null,
+      "src_tx_amount_sum_out_1h": null,
+      "src_tx_amount_mean_out_1h": null,
+      "src_tx_amount_max_out_1h": null,
+      "src_unique_destinations_7d": null,
+      "is_new_destination_24h": null,
+      "is_new_destination_7d": null,
+      "is_new_destination_30d": null,
+      "src_to_dst_tx_count_30d": null,
+      "days_since_last_src_to_dst": null,
+      "src_destination_concentration_7d": null,
+      "src_destination_entropy_7d": null,
+      "is_new_country_30d": null,
+      "country_mismatch": null,
+      "src_failed_count_24h": null,
+      "src_failed_ratio_7d": null
+    }
+  }
+}
+

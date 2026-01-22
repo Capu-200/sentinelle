@@ -2,6 +2,10 @@
 """
 Script pour ajouter manuellement une transaction à l'historique.
 
+⚠️  LEGACY / DEV ONLY ⚠️
+Ce script est conservé pour la phase de développement uniquement.
+En production, utilisez le format de transaction enrichie.
+
 Usage:
     python scripts/push_transaction.py <transaction.json>
     python scripts/push_transaction.py --interactive

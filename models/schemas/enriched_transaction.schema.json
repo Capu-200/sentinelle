@@ -1,0 +1,413 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://payon.com/schemas/enriched_transaction.v1.json",
+  "title": "Transaction enrichie pour scoring ML",
+  "description": "Transaction de base enrichie avec contexte et features pré-calculées pour le moteur ML",
+  "type": "object",
+  "required": ["transaction", "context", "features", "schema_version"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Version du schéma (SemVer)",
+      "example": "1.0.0"
+    },
+    "transaction": {
+      "type": "object",
+      "description": "Transaction de base",
+      "required": [
+        "transaction_id",
+        "initiator_user_id",
+        "source_wallet_id",
+        "destination_wallet_id",
+        "amount",
+        "currency",
+        "transaction_type",
+        "direction",
+        "created_at"
+      ],
+      "properties": {
+        "transaction_id": {
+          "type": "string",
+          "description": "Identifiant unique de la transaction"
+        },
+        "provider": {
+          "type": ["string", "null"],
+          "description": "Identifiant du fournisseur de paiement"
+        },
+        "provider_tx_id": {
+          "type": ["string", "null"],
+          "description": "Identifiant de la transaction dans le système du fournisseur"
+        },
+        "initiator_user_id": {
+          "type": "string",
+          "description": "Identifiant de l'utilisateur initiateur"
+        },
+        "source_wallet_id": {
+          "type": "string",
+          "description": "Identifiant du wallet source (débité)"
+        },
+        "destination_wallet_id": {
+          "type": "string",
+          "description": "Identifiant du wallet destination (crédité)"
+        },
+        "amount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Montant de la transaction (toujours positif)"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Devise au format ISO 4217",
+          "example": "PYC"
+        },
+        "transaction_type": {
+          "type": "string",
+          "enum": ["P2P", "MERCHANT", "CASHIN", "CASHOUT"],
+          "description": "Type de transaction"
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["outgoing", "incoming"],
+          "description": "Sens de la transaction du point de vue de l'utilisateur"
+        },
+        "status": {
+          "type": ["string", "null"],
+          "enum": ["PENDING", "SUCCESS", "FAILED", "CANCELED", null],
+          "description": "État courant de la transaction"
+        },
+        "reason_code": {
+          "type": ["string", "null"],
+          "description": "Code d'erreur normalisé en cas d'échec"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Date et heure de création (ISO 8601 UTC)"
+        },
+        "provider_created_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Date et heure renvoyée par le fournisseur"
+        },
+        "executed_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Date et heure réelle d'exécution"
+        },
+        "country": {
+          "type": ["string", "null"],
+          "description": "Code pays ISO",
+          "pattern": "^[A-Z]{2}$"
+        },
+        "city": {
+          "type": ["string", "null"],
+          "description": "Ville associée à la transaction"
+        },
+        "description": {
+          "type": ["string", "null"],
+          "description": "Libellé libre décrivant le contexte"
+        },
+        "metadata": {
+          "type": ["object", "null"],
+          "description": "Métadonnées techniques",
+          "properties": {
+            "raw_provider_payload": {
+              "type": ["object", "null"],
+              "description": "Données brutes renvoyées par le fournisseur"
+            }
+          }
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "description": "Contexte enrichi pour les règles métier",
+      "required": ["source_wallet", "destination_wallet", "user"],
+      "properties": {
+        "source_wallet": {
+          "type": "object",
+          "required": ["wallet_id", "balance", "status", "created_at", "account_age_minutes"],
+          "properties": {
+            "wallet_id": {
+              "type": "string",
+              "description": "Identifiant du wallet source"
+            },
+            "balance": {
+              "type": "number",
+              "description": "Solde actuel du wallet source"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["active", "blocked", "suspended", "closed"],
+              "description": "Statut du wallet source"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Date de création du wallet (ISO 8601 UTC)"
+            },
+            "account_age_minutes": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Âge du compte en minutes (calculé: created_at transaction - created_at wallet)"
+            }
+          }
+        },
+        "destination_wallet": {
+          "type": "object",
+          "required": ["wallet_id", "status"],
+          "properties": {
+            "wallet_id": {
+              "type": "string",
+              "description": "Identifiant du wallet destination"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["active", "blocked", "suspended", "closed"],
+              "description": "Statut du wallet destination"
+            },
+            "created_at": {
+              "type": ["string", "null"],
+              "format": "date-time",
+              "description": "Date de création du wallet destination (optionnel)"
+            }
+          }
+        },
+        "user": {
+          "type": "object",
+          "required": ["user_id", "status", "risk_level"],
+          "properties": {
+            "user_id": {
+              "type": "string",
+              "description": "Identifiant de l'utilisateur initiateur"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["active", "blocked", "suspended", "closed"],
+              "description": "Statut de l'utilisateur"
+            },
+            "risk_level": {
+              "type": "string",
+              "enum": ["low", "medium", "high"],
+              "description": "Niveau de risque de l'utilisateur"
+            },
+            "created_at": {
+              "type": ["string", "null"],
+              "format": "date-time",
+              "description": "Date de création du compte utilisateur (optionnel)"
+            }
+          }
+        }
+      }
+    },
+    "features": {
+      "type": "object",
+      "description": "Features pré-calculées pour le scoring ML",
+      "required": ["transactional", "historical"],
+      "properties": {
+        "transactional": {
+          "type": "object",
+          "description": "Features transactionnelles (extraites de la transaction)",
+          "required": ["amount", "log_amount", "currency_is_pyc", "direction_outgoing", "hour_of_day", "day_of_week"],
+          "properties": {
+            "amount": {
+              "type": "number",
+              "description": "Montant de la transaction"
+            },
+            "log_amount": {
+              "type": "number",
+              "description": "Logarithme népérien de (1 + amount)"
+            },
+            "currency_is_pyc": {
+              "type": "boolean",
+              "description": "True si currency == 'PYC'"
+            },
+            "direction_outgoing": {
+              "type": "integer",
+              "enum": [0, 1],
+              "description": "1 si direction == 'outgoing', 0 sinon"
+            },
+            "direction_incoming": {
+              "type": "integer",
+              "enum": [0, 1],
+              "description": "1 si direction == 'incoming', 0 sinon"
+            },
+            "transaction_type_p2p": {
+              "type": "integer",
+              "enum": [0, 1],
+              "description": "1 si transaction_type == 'P2P', 0 sinon"
+            },
+            "transaction_type_merchant": {
+              "type": "integer",
+              "enum": [0, 1],
+              "description": "1 si transaction_type == 'MERCHANT', 0 sinon"
+            },
+            "transaction_type_cashin": {
+              "type": "integer",
+              "enum": [0, 1],
+              "description": "1 si transaction_type == 'CASHIN', 0 sinon"
+            },
+            "transaction_type_cashout": {
+              "type": "integer",
+              "enum": [0, 1],
+              "description": "1 si transaction_type == 'CASHOUT', 0 sinon"
+            },
+            "hour_of_day": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 23,
+              "description": "Heure de la journée (0-23) extraite de created_at"
+            },
+            "day_of_week": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 6,
+              "description": "Jour de la semaine (0=lundi, 6=dimanche)"
+            },
+            "country_fr": {
+              "type": "integer",
+              "enum": [0, 1],
+              "description": "1 si country == 'FR', 0 sinon"
+            },
+            "country_be": {
+              "type": "integer",
+              "enum": [0, 1],
+              "description": "1 si country == 'BE', 0 sinon"
+            },
+            "country_kp": {
+              "type": "integer",
+              "enum": [0, 1],
+              "description": "1 si country == 'KP', 0 sinon"
+            }
+          }
+        },
+        "historical": {
+          "type": "object",
+          "description": "Features historiques (agrégats pré-calculés)",
+          "properties": {
+            "avg_amount_30d": {
+              "type": ["number", "null"],
+              "minimum": 0,
+              "description": "Moyenne des montants sur 30 jours (pour R8)"
+            },
+            "tx_last_10min": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "description": "Nombre de transactions dans les 10 dernières minutes (pour R9)"
+            },
+            "is_new_beneficiary": {
+              "type": ["boolean", "null"],
+              "description": "True si nouveau bénéficiaire dans les 30 derniers jours (pour R11)"
+            },
+            "user_country_history": {
+              "type": ["array", "null"],
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Z]{2}$"
+              },
+              "description": "Liste des pays utilisés dans les 30 derniers jours (pour R12)"
+            },
+            "blocked_tx_last_24h": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "description": "Nombre de transactions bloquées dans les 24h (pour R15)"
+            },
+            "src_tx_count_out_5m": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "description": "Nombre de transactions sortantes du wallet source dans les 5 dernières minutes"
+            },
+            "src_tx_count_out_1h": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "description": "Nombre de transactions sortantes du wallet source dans la dernière heure"
+            },
+            "src_tx_count_out_24h": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "description": "Nombre de transactions sortantes du wallet source dans les 24 dernières heures"
+            },
+            "src_tx_count_out_7d": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "description": "Nombre de transactions sortantes du wallet source dans les 7 derniers jours"
+            },
+            "src_tx_amount_sum_out_1h": {
+              "type": ["number", "null"],
+              "minimum": 0,
+              "description": "Somme des montants sortants du wallet source dans la dernière heure"
+            },
+            "src_tx_amount_mean_out_1h": {
+              "type": ["number", "null"],
+              "minimum": 0,
+              "description": "Moyenne des montants sortants du wallet source dans la dernière heure"
+            },
+            "src_tx_amount_max_out_1h": {
+              "type": ["number", "null"],
+              "minimum": 0,
+              "description": "Montant maximum sortant du wallet source dans la dernière heure"
+            },
+            "src_unique_destinations_7d": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "description": "Nombre de destinataires uniques du wallet source dans les 7 derniers jours"
+            },
+            "is_new_destination_24h": {
+              "type": ["boolean", "null"],
+              "description": "True si nouveau destinataire dans les 24 dernières heures"
+            },
+            "is_new_destination_7d": {
+              "type": ["boolean", "null"],
+              "description": "True si nouveau destinataire dans les 7 derniers jours"
+            },
+            "is_new_destination_30d": {
+              "type": ["boolean", "null"],
+              "description": "True si nouveau destinataire dans les 30 derniers jours"
+            },
+            "src_to_dst_tx_count_30d": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "description": "Nombre de transactions entre source et destination dans les 30 derniers jours"
+            },
+            "days_since_last_src_to_dst": {
+              "type": ["number", "null"],
+              "minimum": 0,
+              "description": "Nombre de jours depuis la dernière transaction source→destination"
+            },
+            "src_destination_concentration_7d": {
+              "type": ["number", "null"],
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Part du top-1 destinataire dans les 7 derniers jours (0-1)"
+            },
+            "src_destination_entropy_7d": {
+              "type": ["number", "null"],
+              "minimum": 0,
+              "description": "Entropie de la distribution des destinataires dans les 7 derniers jours"
+            },
+            "is_new_country_30d": {
+              "type": ["boolean", "null"],
+              "description": "True si nouveau pays dans les 30 derniers jours"
+            },
+            "country_mismatch": {
+              "type": ["boolean", "null"],
+              "description": "True si le pays actuel ne correspond pas au pays habituel"
+            },
+            "src_failed_count_24h": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "description": "Nombre de transactions échouées du wallet source dans les 24h"
+            },
+            "src_failed_ratio_7d": {
+              "type": ["number", "null"],
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Ratio de transactions échouées du wallet source sur 7 jours (0-1)"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
