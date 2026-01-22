@@ -39,7 +39,7 @@ Si amount > MAX_TX_AMOUNT → BLOCK
 
 **Seuil**
 
-- `MAX_TX_AMOUNT = 1 000 PYC`
+- `MAX_TX_AMOUNT = 300 PYC`
 
 **Reason_code**
 

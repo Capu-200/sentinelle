@@ -118,10 +118,11 @@ def test_score_transaction():
         "country": "FR",
     }
 
-    print(f"📝 Scoring de la transaction: {transaction['transaction_id']}")
+    tx_id = transaction.get('transaction_id', 'N/A')
+    print(f"📝 Scoring de la transaction: {tx_id}")
 
     # 1. Features
-    print("\n📊 Calcul des features...")
+    print(f"\n📊 Calcul des features (tx_id: {tx_id})...")
     from datetime import datetime
     from dateutil.tz import UTC
 
@@ -145,21 +146,47 @@ def test_score_transaction():
     print(f"   ✅ {len(features)} features calculées")
 
     # 2. Règles
-    print("\n⚖️  Évaluation des règles...")
+    print(f"\n⚖️  Évaluation des règles (tx_id: {tx_id})...")
     wallet_info = store.get_wallet_info(transaction["source_wallet_id"])
     user_profile = store.get_user_profile(transaction["initiator_user_id"])
+    destination_wallet_info = store.get_wallet_info(transaction.get("destination_wallet_id", ""))
 
-    transaction_with_context = {
-        **transaction,
-        "_wallet_balance": wallet_info.get("balance"),
-        "_wallet_status": wallet_info.get("status"),
-        "_user_status": user_profile.get("status"),
-        "_user_risk_level": user_profile.get("risk_level"),
+    # Calculer l'âge du compte
+    account_age_minutes = None
+    try:
+        from dateutil import parser
+        from dateutil.tz import UTC
+
+        tx_time = parser.parse(transaction["created_at"])
+        if tx_time.tzinfo is None:
+            tx_time = tx_time.replace(tzinfo=UTC)
+        else:
+            tx_time = tx_time.astimezone(UTC)
+
+        wallet_created_str = wallet_info.get("created_at")
+        if wallet_created_str:
+            wallet_created = parser.parse(wallet_created_str)
+            if wallet_created.tzinfo is None:
+                wallet_created = wallet_created.replace(tzinfo=UTC)
+            else:
+                wallet_created = wallet_created.astimezone(UTC)
+
+            delta = tx_time - wallet_created
+            account_age_minutes = delta.total_seconds() / 60
+    except Exception:
+        pass
+
+    context = {
+        "wallet_info": wallet_info,
+        "user_profile": user_profile,
+        "destination_wallet_info": destination_wallet_info,
+        "account_age_minutes": account_age_minutes,
     }
 
     rules_output = rules_engine.evaluate(
-        transaction=transaction_with_context,
+        transaction=transaction,
         features=features,
+        context=context,
     )
 
     print(f"   ✅ Décision règles: {rules_output.decision}")
@@ -168,7 +195,7 @@ def test_score_transaction():
     print(f"   🚀 Boost factor: {rules_output.boost_factor:.2f}")
 
     if rules_output.decision == "BLOCK":
-        print("\n🚫 Transaction bloquée par les règles")
+        print(f"\n🚫 Transaction bloquée par les règles (tx_id: {tx_id})")
         decision = decision_engine.decide(
             risk_score=rules_output.rule_score,
             reasons=rules_output.reasons,
@@ -177,14 +204,14 @@ def test_score_transaction():
         )
     else:
         # 3. Scoring ML (mock)
-        print("\n🤖 Scoring ML (mock)...")
+        print(f"\n🤖 Scoring ML (mock) (tx_id: {tx_id})...")
         supervised_score = 0.5
         unsupervised_score = 0.5
         print(f"   ✅ Supervisé: {supervised_score:.3f}")
         print(f"   ✅ Non supervisé: {unsupervised_score:.3f}")
 
         # 4. Score global
-        print("\n🎯 Calcul du score global...")
+        print(f"\n🎯 Calcul du score global (tx_id: {tx_id})...")
         risk_score = scorer.compute_score(
             rule_score=rules_output.rule_score,
             supervised_score=supervised_score,
@@ -194,7 +221,7 @@ def test_score_transaction():
         print(f"   ✅ Risk score: {risk_score:.3f}")
 
         # 5. Décision
-        print("\n⚖️  Décision finale...")
+        print(f"\n⚖️  Décision finale (tx_id: {tx_id})...")
         decision = decision_engine.decide(
             risk_score=risk_score,
             reasons=rules_output.reasons,
@@ -203,7 +230,8 @@ def test_score_transaction():
         )
 
     # Résultat
-    print("\n📊 Résultat final:")
+    print(f"\n📊 Résultat final (tx_id: {tx_id}):")
+    print(f"   Transaction ID: {tx_id}")
     print(f"   Risk score: {decision.risk_score:.3f}")
     print(f"   Decision: {decision.decision}")
     print(f"   Reasons: {', '.join(decision.reasons) if decision.reasons else 'Aucune'}")
@@ -227,8 +255,9 @@ def test_blocked_transactions():
 
     # Test R1: Montant > 300
     print("\n🔴 Test R1: Montant > 300 (devrait être bloqué)")
+    tx_id_r1 = "tx_test_r1"
     tx_r1 = {
-        "transaction_id": "tx_test_r1",
+        "transaction_id": tx_id_r1,
         "initiator_user_id": "user_001",
         "source_wallet_id": "wallet_src_001",
         "destination_wallet_id": "wallet_dst_001",
@@ -239,7 +268,8 @@ def test_blocked_transactions():
         "created_at": "2026-01-21T14:00:00Z",
     }
 
-    rules_output = rules_engine.evaluate(transaction=tx_r1, features={})
+    rules_output = rules_engine.evaluate(transaction=tx_r1, features={}, context={})
+    print(f"   Transaction ID: {tx_id_r1}")
     print(f"   Décision: {rules_output.decision}")
     print(f"   Raisons: {', '.join(rules_output.reasons) if rules_output.reasons else 'Aucune'}")
     assert rules_output.decision == "BLOCK", "R1 devrait bloquer"
@@ -247,8 +277,9 @@ def test_blocked_transactions():
 
     # Test R2: Pays interdit
     print("\n🔴 Test R2: Pays interdit (KP) (devrait être bloqué)")
+    tx_id_r2 = "tx_test_r2"
     tx_r2 = {
-        "transaction_id": "tx_test_r2",
+        "transaction_id": tx_id_r2,
         "initiator_user_id": "user_001",
         "source_wallet_id": "wallet_src_001",
         "destination_wallet_id": "wallet_dst_001",
@@ -260,7 +291,8 @@ def test_blocked_transactions():
         "country": "KP",
     }
 
-    rules_output = rules_engine.evaluate(transaction=tx_r2, features={})
+    rules_output = rules_engine.evaluate(transaction=tx_r2, features={}, context={})
+    print(f"   Transaction ID: {tx_id_r2}")
     print(f"   Décision: {rules_output.decision}")
     print(f"   Raisons: {', '.join(rules_output.reasons) if rules_output.reasons else 'Aucune'}")
     assert rules_output.decision == "BLOCK", "R2 devrait bloquer"
@@ -268,8 +300,9 @@ def test_blocked_transactions():
 
     # Test transaction normale
     print("\n🟢 Test transaction normale (devrait être ALLOW)")
+    tx_id_normal = "tx_test_normal"
     tx_normal = {
-        "transaction_id": "tx_test_normal",
+        "transaction_id": tx_id_normal,
         "initiator_user_id": "user_001",
         "source_wallet_id": "wallet_src_001",
         "destination_wallet_id": "wallet_dst_001",
@@ -281,7 +314,8 @@ def test_blocked_transactions():
         "country": "FR",
     }
 
-    rules_output = rules_engine.evaluate(transaction=tx_normal, features={})
+    rules_output = rules_engine.evaluate(transaction=tx_normal, features={}, context={})
+    print(f"   Transaction ID: {tx_id_normal}")
     print(f"   Décision: {rules_output.decision}")
     print(f"   Raisons: {', '.join(rules_output.reasons) if rules_output.reasons else 'Aucune'}")
     assert rules_output.decision == "ALLOW", "Transaction normale devrait être ALLOW"
