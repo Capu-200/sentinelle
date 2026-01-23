@@ -138,8 +138,13 @@ def compute_features_for_dataset(
             start_idx = chunk_idx * chunk_size
             end_idx = min((chunk_idx + 1) * chunk_size, len(transactions_df))
             
+            # Log de démarrage du chunk
+            if verbose:
+                print(f"   📦 Démarrage chunk {chunk_idx + 1}/{n_chunks} (transactions {start_idx:,}-{end_idx:,})...", flush=True)
+            
             # Préparer les args pour ce chunk uniquement (à la volée)
             chunk_args = []
+            prep_start = time.time()
             for idx in range(start_idx, end_idx):
                 transaction = transactions_df.iloc[idx]
                 transaction_dict = transaction.to_dict()
@@ -155,9 +160,16 @@ def compute_features_for_dataset(
                 
                 chunk_args.append((idx, transaction_dict, historical_df_dict))
             
+            prep_time = time.time() - prep_start
+            if verbose:
+                print(f"   ✅ Préparation terminée en {prep_time:.1f}s ({len(chunk_args)} transactions)", flush=True)
+            
             chunk_start_time = time.time()
             
             # Calculer les features pour ce chunk en parallèle
+            if verbose:
+                print(f"   🔄 Calcul des features en cours...", flush=True)
+            
             with mp.Pool(processes=n_jobs) as pool:
                 chunk_features = pool.map(
                     partial(_compute_features_single, windows=windows),
@@ -181,11 +193,12 @@ def compute_features_for_dataset(
                     'eta': f'{eta/60:.1f}min'
                 })
             elif verbose:
-                print(f"   Chunk {chunk_idx + 1}/{n_chunks} ({start_idx}-{end_idx}) | "
+                print(f"   ✅ Chunk {chunk_idx + 1}/{n_chunks} terminé | "
                       f"Chunk speed: {chunk_speed:.0f} it/s | "
                       f"Avg speed: {avg_speed:.0f} it/s | "
-                      f"Progress: {progress:.1f}% | "
-                      f"ETA: {eta/60:.1f}min")
+                      f"Progress: {progress:.1f}% ({total_processed:,}/{len(transactions_df):,}) | "
+                      f"ETA: {eta/60:.1f}min | "
+                      f"Temps écoulé: {elapsed/60:.1f}min", flush=True)
             
             features_list.extend(chunk_features)
     else:
