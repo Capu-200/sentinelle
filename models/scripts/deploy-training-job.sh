@@ -85,7 +85,7 @@ gcloud run jobs deploy "$JOB_NAME" \
     --source . \
     --region="$REGION" \
     --set-env-vars="DATA_DIR=/app/data,ARTIFACTS_DIR=/app/artifacts,BUCKET_NAME=$BUCKET_NAME,VERSION=$VERSION" \
-    --memory=8Gi \
+    --memory=16Gi \
     --cpu=8 \
     --task-timeout=7200 \
     --max-retries=1 \
