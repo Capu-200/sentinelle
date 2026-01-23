@@ -4,30 +4,18 @@ __pycache__/
 *$py.class
 *.so
 .Python
+venv/
+env/
+ENV/
+.venv
 *.egg-info/
 dist/
 build/
-*.egg
-
-# Virtual environments
-backend/venv/
-venv/
-ENV/
-env/
-.venv/
-
-# Alembic (garder les migrations mais ignorer les fichiers temporaires)
-*.pyc
-
-# Node.js (pour le front)
-node_modules/
-front/node_modules/
 
 # Environment variables
 .env
 .env.local
 .env.*.local
-*.env
 
 # IDE
 .vscode/
@@ -35,38 +23,28 @@ front/node_modules/
 *.swp
 *.swo
 *~
-.project
-.classpath
-.settings/
 
 # OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
-Desktop.ini
 
 # Logs
 *.log
-logs/
+
+# Database
+*.db
+*.sqlite
+
+# Alembic
+alembic/__pycache__/
 
 # Docker
 .dockerignore
 
-# Jupyter Notebook
-.ipynb_checkpoints
-*.ipynb
+# Cloud SQL Auth Proxy
+cloud-sql-proxy
 
-# Data files - fichiers trop volumineux pour GitHub
-models/Data/raw/
-models/Data/processed/
-*.csv
-
-# ML Artifacts - modèles entraînés et artefacts versionnés
-models/artifacts/*
-!models/artifacts/.gitkeep
-!models/artifacts/latest
-models/artifacts/v*/
+# Secrets
+secrets/
+*.pem
+*.key
