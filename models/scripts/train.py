@@ -125,10 +125,13 @@ def main():
     print("ÉTAPE 2: Feature Engineering")
     print("=" * 60)
     
-    # Déterminer le nombre de jobs (utiliser tous les cores disponibles - 1)
+    # Déterminer le nombre de jobs (réduire pour éviter OOM)
     import multiprocessing as mp
-    n_jobs = max(1, mp.cpu_count() - 1)
-    print(f"\n⚙️  Configuration: {n_jobs} processus parallèles (sur {mp.cpu_count()} cores)")
+    n_cores = mp.cpu_count()
+    # Utiliser 5 processus max pour éviter les problèmes de mémoire
+    # Chaque processus charge l'historique complet, donc on limite pour la RAM
+    n_jobs = min(5, max(1, n_cores - 2))  # Max 5 processus, laisser 2 cores libres
+    print(f"\n⚙️  Configuration: {n_jobs} processus parallèles (sur {n_cores} cores)")
     
     # Features pour PaySim (supervisé)
     print(f"\n🔧 Calcul des features PaySim (train)...")
