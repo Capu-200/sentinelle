@@ -4,10 +4,14 @@ Entraînement du modèle supervisé (LightGBM).
 
 from __future__ import annotations
 
+import pickle
 from pathlib import Path
 from typing import Any, Dict
 
+import lightgbm as lgb
+import numpy as np
 import pandas as pd
+from sklearn.metrics import average_precision_score
 
 from ..base import BaseModel
 
@@ -24,10 +28,26 @@ class SupervisedModel(BaseModel):
             config: Configuration des hyperparamètres
         """
         super().__init__(model_version)
-        self.config = config or {}
-        # TODO: Importer et initialiser LightGBM
-        # import lightgbm as lgb
-        # self.model = lgb.LGBMClassifier(**self.config)
+        
+        # Configuration par défaut optimisée pour la détection de fraude
+        default_config = {
+            "objective": "binary",
+            "metric": "binary_logloss",
+            "boosting_type": "gbdt",
+            "num_leaves": 31,
+            "learning_rate": 0.05,
+            "feature_fraction": 0.9,
+            "bagging_fraction": 0.8,
+            "bagging_freq": 5,
+            "verbose": -1,
+            "random_state": 42,
+        }
+        
+        # Fusionner avec la config fournie
+        self.config = {**default_config, **(config or {})}
+        
+        # Initialiser le modèle
+        self.model = lgb.LGBMClassifier(**self.config)
 
     def train(self, X: pd.DataFrame, y: pd.Series, **kwargs) -> None:
         """
@@ -36,13 +56,46 @@ class SupervisedModel(BaseModel):
         Args:
             X: Features d'entraînement
             y: Labels (0/1 pour fraude)
-            **kwargs: Arguments additionnels (ex: validation set)
+            **kwargs: Arguments additionnels (ex: val_data, val_labels)
         """
-        # TODO: Implémenter l'entraînement
-        # - Gérer le déséquilibre (scale_pos_weight)
-        # - Optimiser PR-AUC
-        # - Validation set si fourni
-        # - Early stopping
+        # Calculer scale_pos_weight pour gérer le déséquilibre
+        fraud_count = y.sum()
+        legit_count = len(y) - fraud_count
+        
+        if fraud_count > 0:
+            scale_pos_weight = legit_count / fraud_count
+        else:
+            scale_pos_weight = 1.0
+        
+        # Mettre à jour la config avec scale_pos_weight
+        self.model.set_params(scale_pos_weight=scale_pos_weight)
+        
+        # Préparer les données de validation si fournies
+        val_data = kwargs.get("val_data")
+        val_labels = kwargs.get("val_labels")
+        
+        if val_data is not None and val_labels is not None:
+            # Early stopping avec validation set
+            callbacks = [
+                lgb.early_stopping(stopping_rounds=50, verbose=False),
+                lgb.log_evaluation(period=100, show_stdv=False),
+            ]
+            
+            self.model.fit(
+                X,
+                y,
+                eval_set=[(val_data, val_labels)],
+                callbacks=callbacks,
+            )
+            
+            # Calculer PR-AUC sur le validation set
+            val_pred = self.model.predict_proba(val_data)[:, 1]
+            pr_auc = average_precision_score(val_labels, val_pred)
+            print(f"   📊 PR-AUC (validation): {pr_auc:.4f}")
+        else:
+            # Entraînement sans validation set
+            self.model.fit(X, y)
+        
         self.is_trained = True
 
     def predict(self, X: pd.DataFrame) -> pd.Series:
@@ -57,24 +110,33 @@ class SupervisedModel(BaseModel):
         """
         if not self.is_trained:
             raise ValueError("Le modèle doit être entraîné avant la prédiction")
-        # TODO: Implémenter la prédiction
-        # return self.model.predict_proba(X)[:, 1]
-        return pd.Series([0.0] * len(X))
+        
+        # Prédire les probabilités (classe 1 = fraude)
+        probabilities = self.model.predict_proba(X)[:, 1]
+        return pd.Series(probabilities, index=X.index)
 
     def save(self, path: Path) -> None:
         """Sauvegarde le modèle."""
-        # TODO: Implémenter la sauvegarde
-        # import pickle
-        # with open(path, 'wb') as f:
-        #     pickle.dump(self.model, f)
-        pass
+        path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(path, "wb") as f:
+            pickle.dump(
+                {
+                    "model": self.model,
+                    "config": self.config,
+                    "model_version": self.model_version,
+                },
+                f,
+            )
 
     def load(self, path: Path) -> None:
         """Charge le modèle."""
-        # TODO: Implémenter le chargement
-        # import pickle
-        # with open(path, 'rb') as f:
-        #     self.model = pickle.load(f)
+        with open(path, "rb") as f:
+            data = pickle.load(f)
+            self.model = data["model"]
+            self.config = data.get("config", {})
+            self.model_version = data.get("model_version", "1.0.0")
+        
         self.is_trained = True
 
 
