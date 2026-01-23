@@ -48,3 +48,33 @@ cloud-sql-proxy
 secrets/
 *.pem
 *.key
+
+# ML Models and Artifacts
+models/artifacts/
+*.pkl
+*.h5
+*.joblib
+
+# Data files (volumineux)
+models/Data/raw/*.csv
+models/Data/processed/*.csv
+models/Data/*.json
+!models/Data/*/README.md
+!models/Data/README.md
+
+# Cloud SQL Auth Proxy (déjà dans backend/)
+backend/cloud-sql-proxy
+models/cloud-sql-proxy
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.pytest_cache/
+
+# IDE specific
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
