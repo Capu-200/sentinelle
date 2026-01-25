@@ -134,14 +134,25 @@ def main():
     print(f"\n⚙️  Configuration: {n_jobs} processus parallèles (sur {n_cores} cores)")
     
     # Features pour PaySim (supervisé)
+    # OPTIMISATION: Échantillonnage pour accélérer l'entraînement initial
+    # On prend un échantillon de 500k transactions pour l'entraînement rapide
+    # TODO: Entraîner sur le dataset complet une fois l'optimisation terminée
+    paysim_train_sample = paysim_train.sample(
+        n=min(500000, len(paysim_train)),
+        random_state=42
+    ).sort_values("created_at").reset_index(drop=True)
+    
     print(f"\n🔧 Calcul des features PaySim (train)...")
+    print(f"   ⚠️  Échantillon: {len(paysim_train_sample):,} transactions (sur {len(paysim_train):,})")
+    print(f"   💡 Pour l'entraînement complet, retirer l'échantillonnage dans train.py")
+    
     paysim_train_features = compute_features_for_dataset(
-        paysim_train,
+        paysim_train_sample,
         verbose=True,
         n_jobs=n_jobs,
         chunk_size=1000,  # Chunks de 1000 transactions pour éviter la surcharge mémoire
     )
-    paysim_train_labels = paysim_train["is_fraud"] if "is_fraud" in paysim_train.columns else None
+    paysim_train_labels = paysim_train_sample["is_fraud"] if "is_fraud" in paysim_train.columns else None
     
     print(f"\n🔧 Calcul des features PaySim (val)...")
     paysim_val_features = compute_features_for_dataset(
