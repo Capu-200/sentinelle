@@ -45,25 +45,19 @@ export default function LoginPage() {
 
     return (
         <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
-            {/* Animated Background */}
-            <div className="absolute inset-0 bg-slate-50 dark:bg-[#050505] z-0" />
+            {/* Background Gradients */}
+            <div className="absolute top-0 left-0 w-full h-full bg-slate-50 dark:bg-slate-950 -z-20" />
+            <div className="absolute top-1/4 -left-20 w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px] -z-10" />
+            <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-purple-500/20 rounded-full blur-[100px] -z-10" />
 
-            {/* Ambient Orbs */}
-            <div className="absolute top-[-10%] left-[-10%] h-[500px] w-[500px] rounded-full bg-indigo-600/30 blur-[120px] mix-blend-screen animate-pulse z-0" />
-            <div className="absolute bottom-[-10%] right-[-10%] h-[500px] w-[500px] rounded-full bg-purple-600/20 blur-[120px] mix-blend-screen animate-pulse z-0 duration-700" />
-
-            <div className="w-full max-w-md z-10 relative">
-                {/* Logo Section */}
+            <div className="w-full max-w-md">
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center p-3 bg-white/10 backdrop-blur-md rounded-2xl mb-4 shadow-lg border border-white/20">
-                        <div className="h-8 w-8 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center shadow-inner">
-                            <Lock className="text-white h-4 w-4" />
-                        </div>
-                    </div>
-                    <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">
-                        PayOn
+                    <h1 className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 mb-2">
+                        Sentinelle
                     </h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Des virements sécurisés</p>
+                    <p className="text-slate-600 dark:text-slate-400">
+                        Sécurisez vos transactions en temps réel
+                    </p>
                 </div>
 
                 <GlassCard className="p-8 backdrop-blur-xl border-white/20 dark:border-white/10 shadow-2xl">
@@ -83,10 +77,7 @@ export default function LoginPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <div className="flex justify-between items-center ml-1">
-                                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Mot de passe</label>
-                                <Link href="#" className="text-xs font-semibold text-indigo-600 hover:text-indigo-500 hover:underline">Oublié ?</Link>
-                            </div>
+                            <label className="text-sm font-semibold ml-1 text-slate-700 dark:text-slate-300">Mot de passe</label>
                             <div className="relative group">
                                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                                 <input
@@ -99,7 +90,7 @@ export default function LoginPage() {
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 focus:outline-none"
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
                                 >
                                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                                 </button>
@@ -116,20 +107,14 @@ export default function LoginPage() {
                     </form>
 
                     <div className="mt-6 pt-6 border-t border-slate-100 dark:border-white/5 text-center">
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
                             Pas encore de compte ?{' '}
-                            <Link href="/register" className="font-bold text-indigo-600 hover:text-indigo-500 hover:underline">
-                                Créer un compte
+                            <Link href="/register" className="text-indigo-600 font-bold hover:underline">
+                                S'inscrire
                             </Link>
                         </p>
                     </div>
                 </GlassCard>
-
-                {/* Secure Badge */}
-                <div className="mt-8 flex justify-center items-center gap-2 text-xs text-slate-400 font-medium opacity-60">
-                    <Lock className="h-3 w-3" />
-                    <span>Connexion sécurisée SSL 256-bit</span>
-                </div>
             </div>
         </div>
     );

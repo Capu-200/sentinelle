@@ -12,4 +12,5 @@ export interface Transaction {
     recipient: string;
     status: TransactionStatus;
     date: string; // ISO string
+    direction?: 'INCOMING' | 'OUTGOING';
 }
