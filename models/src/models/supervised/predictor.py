@@ -7,6 +7,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict
 
+import numpy as np
 import pandas as pd
 
 from ..base import BaseModel
@@ -149,6 +150,16 @@ class SupervisedPredictor:
             # Vérifier si au moins une feature historique a une valeur non-nulle/non-zéro
             for col in historical_cols:
                 val = df_complete[col].iloc[0]
+                
+                # Gérer les arrays numpy (éviter l'erreur "ambiguous truth value")
+                if isinstance(val, np.ndarray):
+                    # Si c'est un array, vérifier s'il est non-vide et contient des valeurs significatives
+                    if val.size > 0 and np.any(val != 0) and np.any(~np.isnan(val)):
+                        has_historical = True
+                        break
+                    continue
+                
+                # Pour les valeurs scalaires, vérifier normalement
                 # Considérer comme historique présent si valeur significative
                 if val not in [None, 0, 0.0, -1.0, False, []]:
                     # Exception : -1.0 pour days_since est normal même avec historique

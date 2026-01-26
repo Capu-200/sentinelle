@@ -14,7 +14,7 @@ import pandas as pd
 
 
 def prepare_training_data(
-    data_path: Path,
+    data_source: Path | pd.DataFrame,
     train_ratio: float = 0.7,
     val_ratio: float = 0.15,
     test_ratio: float = 0.15,
@@ -23,7 +23,7 @@ def prepare_training_data(
     Prépare les données pour l'entraînement avec split temporel.
 
     Args:
-        data_path: Chemin vers le fichier de données nettoyées
+        data_source: Chemin vers le fichier de données nettoyées OU un DataFrame
         train_ratio: Proportion pour l'entraînement (défaut: 0.7)
         val_ratio: Proportion pour la validation (défaut: 0.15)
         test_ratio: Proportion pour le test (défaut: 0.15)
@@ -33,7 +33,8 @@ def prepare_training_data(
 
     Raises:
         ValueError: Si les ratios ne somment pas à 1.0
-        FileNotFoundError: Si le fichier de données n'existe pas
+        FileNotFoundError: Si le fichier de données n'existe pas (si data_source est un Path)
+        TypeError: Si data_source n'est ni un Path ni un DataFrame
     """
     # Validation des ratios
     if abs(train_ratio + val_ratio + test_ratio - 1.0) > 1e-6:
@@ -42,14 +43,18 @@ def prepare_training_data(
             f"train={train_ratio}, val={val_ratio}, test={test_ratio}"
         )
 
-    # Charger les données
-    if not data_path.exists():
-        raise FileNotFoundError(f"Fichier de données non trouvé: {data_path}")
-
-    print(f"📊 Chargement des données depuis {data_path}...")
-    df = pd.read_csv(data_path)
-
-    print(f"   ✅ {len(df)} transactions chargées")
+    # Charger les données si data_source est un Path
+    if isinstance(data_source, Path):
+        if not data_source.exists():
+            raise FileNotFoundError(f"Fichier de données non trouvé: {data_source}")
+        print(f"📊 Chargement des données depuis {data_source}...")
+        df = pd.read_csv(data_source)
+        print(f"   ✅ {len(df)} transactions chargées")
+    elif isinstance(data_source, pd.DataFrame):
+        df = data_source.copy()
+        print(f"📊 Utilisation du DataFrame fourni ({len(df)} transactions)...")
+    else:
+        raise TypeError("data_source doit être un Path ou un DataFrame")
 
     # Convertir created_at en datetime si ce n'est pas déjà fait
     if "created_at" in df.columns:

@@ -138,42 +138,15 @@ def main():
         paysim_df = paysim_df.sort_values("created_at").tail(args.test_size).reset_index(drop=True)
         print(f"   ✅ Dataset limité à {len(paysim_df):,} transactions")
         print(f"   📅 Période: {paysim_df['created_at'].min()} → {paysim_df['created_at'].max()}")
-        
-        # Split temporel directement sur le DataFrame limité (pas de rechargement)
-        print(f"\n📊 Split temporel PaySim (sur dataset limité)...")
-        paysim_df = paysim_df.sort_values("created_at").reset_index(drop=True)
-        n_total = len(paysim_df)
-        n_train = int(n_total * 0.7)
-        n_val = int(n_total * 0.15)
-        
-        paysim_train = paysim_df.iloc[:n_train].copy()
-        paysim_val = paysim_df.iloc[n_train:n_train + n_val].copy()
-        paysim_test = paysim_df.iloc[n_train + n_val:].copy()
-        
-        print(f"📊 Split temporel:")
-        print(f"   Train: {len(paysim_train)} transactions ({len(paysim_train)/n_total*100:.1f}%)")
-        print(f"      Période: {paysim_train['created_at'].min()} → {paysim_train['created_at'].max()}")
-        print(f"   Val:   {len(paysim_val)} transactions ({len(paysim_val)/n_total*100:.1f}%)")
-        print(f"      Période: {paysim_val['created_at'].min()} → {paysim_val['created_at'].max()}")
-        print(f"   Test:  {len(paysim_test)} transactions ({len(paysim_test)/n_total*100:.1f}%)")
-        print(f"      Période: {paysim_test['created_at'].min()} → {paysim_test['created_at'].max()}")
-        
-        # Vérifier le leakage temporel
-        if paysim_train["created_at"].max() >= paysim_val["created_at"].min():
-            print("⚠️  LEAKAGE TEMPOREL DÉTECTÉ: Train max >= Val min")
-        elif paysim_val["created_at"].max() >= paysim_test["created_at"].min():
-            print("⚠️  LEAKAGE TEMPOREL DÉTECTÉ: Val max >= Test min")
-        else:
-            print("   ✅ Aucun leakage temporel détecté")
-    else:
-        # Split temporel PaySim (mode normal, utilise prepare_training_data)
-        print(f"\n📊 Split temporel PaySim...")
-        paysim_train, paysim_val, paysim_test = prepare_training_data(
-            paysim_path,
-            train_ratio=0.7,
-            val_ratio=0.15,
-            test_ratio=0.15,
-        )
+    
+    # Split temporel PaySim (utilise le DataFrame déjà chargé pour éviter le rechargement)
+    print(f"\n📊 Split temporel PaySim...")
+    paysim_train, paysim_val, paysim_test = prepare_training_data(
+        paysim_df,  # Passe le DataFrame directement (optimisation)
+        train_ratio=0.7,
+        val_ratio=0.15,
+        test_ratio=0.15,
+    )
     
     # Dataset Payon Legit (non supervisé)
     payon_path = args.data_dir / "payon_legit_clean.csv"
@@ -185,10 +158,10 @@ def main():
     payon_df["created_at"] = pd.to_datetime(payon_df["created_at"], utc=True)
     print(f"   ✅ {len(payon_df)} transactions chargées")
     
-    # Split temporel Payon
+    # Split temporel Payon (utilise le DataFrame déjà chargé pour éviter le rechargement)
     print(f"\n📊 Split temporel Payon...")
     payon_train, payon_val, payon_test = prepare_training_data(
-        payon_path,
+        payon_df,  # Passe le DataFrame directement (optimisation)
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,
