@@ -149,8 +149,21 @@ def compute_features_for_dataset(
                 transaction = transactions_df.iloc[idx]
                 transaction_dict = transaction.to_dict()
                 
-                # Historique = toutes les transactions AVANT cette transaction
-                historical_df = transactions_df.iloc[:idx].copy()
+                # OPTIMISATION: Limiter l'historique à une fenêtre temporelle (30 jours max)
+                # Au lieu de charger TOUT l'historique, on ne prend que les 30 derniers jours
+                # Cela réduit drastiquement la mémoire et le temps de calcul
+                tx_created_at = pd.to_datetime(transaction_dict.get("created_at"), utc=True)
+                
+                if pd.notna(tx_created_at):
+                    # Filtrer par date : seulement les transactions dans les 30 derniers jours
+                    cutoff_date = tx_created_at - pd.Timedelta(days=30)
+                    historical_df = transactions_df[
+                        (transactions_df.index < idx) & 
+                        (pd.to_datetime(transactions_df["created_at"], utc=True) >= cutoff_date)
+                    ].copy()
+                else:
+                    # Pas de timestamp → historique vide
+                    historical_df = transactions_df.iloc[:0].copy()
                 
                 # Convertir en dict pour la sérialisation (multiprocessing)
                 if len(historical_df) > 0:
