@@ -28,13 +28,25 @@ fi
 # Créer le dossier artifacts si nécessaire
 mkdir -p "$ARTIFACTS_DIR"
 
+# Détecter la commande Python (python3 ou python)
+if command -v python3 &> /dev/null; then
+    PYTHON_CMD="python3"
+elif command -v python &> /dev/null; then
+    PYTHON_CMD="python"
+else
+    echo "❌ Erreur: python3 ou python non trouvé"
+    echo "   Installez Python 3.11+ ou activez votre environnement virtuel"
+    exit 1
+fi
+
 # Lancer l'entraînement en mode local (dataset complet, tous les cores)
 echo "📊 Démarrage de l'entraînement LOCAL..."
 echo "   💡 Mode local: dataset complet, pas d'échantillonnage"
 echo "   💡 Utilise tous les cores disponibles"
+echo "   💡 Python: $PYTHON_CMD"
 echo ""
 
-python scripts/train.py \
+$PYTHON_CMD scripts/train.py \
     --data-dir "$DATA_DIR" \
     --artifacts-dir "$ARTIFACTS_DIR" \
     --version "$VERSION" \
