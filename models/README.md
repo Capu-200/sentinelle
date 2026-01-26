@@ -30,13 +30,18 @@ Retourne {risk_score, decision, reasons}
 ### 🎓 [01_ENTRAINEMENT.md](01_ENTRAINEMENT.md)
 **Pour** : Entraîner et déployer les modèles ML
 
+**Deux workflows disponibles** :
+- **☁️ Cloud** : Entraînement sur Cloud Run Jobs (automatisé, scalable)
+- **💻 Local** : Entraînement local → Upload vers Cloud Storage (dataset complet, pas de timeout)
+
+**Contenu** :
 - Préparation des données (mapping PaySim, split temporel)
 - Feature engineering pour l'entraînement
 - Ajustement des paramètres des modèles
 - Entraînement (LightGBM supervisé + IsolationForest non supervisé)
 - Calibration des seuils
 - Versioning des modèles
-- Déploiement sur Cloud Run Jobs
+- Déploiement (Cloud ou Local)
 
 **Quand l'utiliser** : Pour créer ou mettre à jour les modèles ML
 
@@ -82,6 +87,7 @@ Retourne {risk_score, decision, reasons}
 
 ### 1. Entraîner un modèle
 
+**Option A : Cloud** (recommandé pour production)
 ```bash
 cd models
 ./scripts/deploy-training-job.sh \
@@ -91,7 +97,14 @@ cd models
   "1.0.0"
 ```
 
-Voir [01_ENTRAINEMENT.md](01_ENTRAINEMENT.md) pour les détails.
+**Option B : Local** (recommandé pour développement)
+```bash
+cd models
+./scripts/train-local.sh 1.0.0
+./scripts/upload-artifacts.sh 1.0.0
+```
+
+Voir [01_ENTRAINEMENT.md](01_ENTRAINEMENT.md) pour les détails des deux workflows.
 
 ---
 
