@@ -59,6 +59,11 @@ def main():
         help="Version du modèle (SemVer)",
     )
     parser.add_argument(
+        "--local",
+        action="store_true",
+        help="Mode local: utilise tous les cores et dataset complet (pas d'échantillonnage)",
+    )
+    parser.add_argument(
         "--train-split-date",
         type=str,
         help="Date de fin du set d'entraînement (ISO format)",
@@ -125,23 +130,46 @@ def main():
     print("ÉTAPE 2: Feature Engineering")
     print("=" * 60)
     
-    # Déterminer le nombre de jobs (réduire pour éviter OOM)
+    # Déterminer le nombre de jobs
     import multiprocessing as mp
     n_cores = mp.cpu_count()
-    # Utiliser 5 processus max pour éviter les problèmes de mémoire
-    # Chaque processus charge l'historique complet, donc on limite pour la RAM
-    n_jobs = min(5, max(1, n_cores - 2))  # Max 5 processus, laisser 2 cores libres
-    print(f"\n⚙️  Configuration: {n_jobs} processus parallèles (sur {n_cores} cores)")
+    
+    if args.local:
+        # Mode local: utiliser tous les cores disponibles (optimisé pour 10 cores / 32GB RAM)
+        n_jobs = max(1, n_cores - 1)  # Laisser 1 core libre
+        use_full_dataset = True
+        print(f"\n⚙️  Configuration LOCAL: {n_jobs} processus parallèles (sur {n_cores} cores)")
+        print(f"   💡 Mode local: dataset complet, pas d'échantillonnage")
+    else:
+        # Mode Cloud: réduire pour éviter OOM
+        n_jobs = min(5, max(1, n_cores - 2))  # Max 5 processus, laisser 2 cores libres
+        use_full_dataset = False
+        print(f"\n⚙️  Configuration CLOUD: {n_jobs} processus parallèles (sur {n_cores} cores)")
+        print(f"   💡 Mode Cloud: échantillonnage activé pour éviter timeout")
     
     # Features pour PaySim (supervisé)
-    print(f"\n🔧 Calcul des features PaySim (train)...")
+    if use_full_dataset:
+        # Mode local: utiliser le dataset complet
+        paysim_train_sample = paysim_train
+        print(f"\n🔧 Calcul des features PaySim (train) - DATASET COMPLET...")
+        print(f"   📊 {len(paysim_train_sample):,} transactions (dataset complet)")
+    else:
+        # Mode Cloud: échantillonnage pour accélérer
+        paysim_train_sample = paysim_train.sample(
+            n=min(500000, len(paysim_train)),
+            random_state=42
+        ).sort_values("created_at").reset_index(drop=True)
+        print(f"\n🔧 Calcul des features PaySim (train)...")
+        print(f"   ⚠️  Échantillon: {len(paysim_train_sample):,} transactions (sur {len(paysim_train):,})")
+        print(f"   💡 Pour l'entraînement complet, utiliser --local")
+    
     paysim_train_features = compute_features_for_dataset(
-        paysim_train,
+        paysim_train_sample,
         verbose=True,
         n_jobs=n_jobs,
         chunk_size=1000,  # Chunks de 1000 transactions pour éviter la surcharge mémoire
     )
-    paysim_train_labels = paysim_train["is_fraud"] if "is_fraud" in paysim_train.columns else None
+    paysim_train_labels = paysim_train_sample["is_fraud"] if "is_fraud" in paysim_train.columns else None
     
     print(f"\n🔧 Calcul des features PaySim (val)...")
     paysim_val_features = compute_features_for_dataset(

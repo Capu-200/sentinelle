@@ -34,28 +34,46 @@ gcloud services enable run.googleapis.com \
 # Se déplacer dans le dossier models
 cd "$(dirname "$0")/.." || exit 1
 
-# Vérifier que les artefacts existent
-ARTIFACTS_DIR="artifacts"
-if [ ! -d "$ARTIFACTS_DIR" ]; then
-    echo "❌ Erreur: Le dossier $ARTIFACTS_DIR n'existe pas"
-    echo "   Exécutez d'abord: python scripts/train.py --version 1.0.0"
-    exit 1
+# Bucket Cloud Storage pour les artefacts
+BUCKET_NAME="${PROJECT_ID}-ml-data"
+
+# Créer un .dockerignore temporaire pour exclure les gros fichiers
+cat > .dockerignore << 'EOF'
+Data/raw/*
+*.csv
+artifacts/*
+__pycache__
+*.pyc
+.git
+Dockerfile.training
+EOF
+
+# Renommer temporairement Dockerfile.api en Dockerfile pour le build
+if [ -f "Dockerfile.api" ]; then
+    mv Dockerfile Dockerfile.training 2>/dev/null || true
+    cp Dockerfile.api Dockerfile
 fi
 
 # Déployer sur Cloud Run
 echo "📦 Construction et déploiement de l'image Docker..."
+echo "   Les modèles seront téléchargés depuis gs://$BUCKET_NAME/artifacts/ au démarrage"
 gcloud run deploy "$SERVICE_NAME" \
     --source . \
     --region="$REGION" \
     --platform=managed \
     --allow-unauthenticated \
-    --set-env-vars="MODEL_VERSION=$MODEL_VERSION,ARTIFACTS_DIR=/app/artifacts" \
+    --set-env-vars="MODEL_VERSION=$MODEL_VERSION,ARTIFACTS_DIR=/app/artifacts,BUCKET_NAME=$BUCKET_NAME" \
     --memory=2Gi \
     --cpu=2 \
     --timeout=300 \
     --max-instances=10 \
     --min-instances=0 \
     --project="$PROJECT_ID"
+
+# Restaurer le Dockerfile original
+if [ -f "Dockerfile.training" ]; then
+    mv Dockerfile.training Dockerfile
+fi
 
 # Obtenir l'URL du service
 SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" \
