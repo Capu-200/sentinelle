@@ -11,13 +11,24 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import text
+from contextlib import asynccontextmanager
+from sqlmodel import SQLModel
 
 from app.database import get_db, engine
+from .routers import auth
+from .models import User
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Create tables on startup
+    SQLModel.metadata.create_all(engine)
+    yield
 
 app = FastAPI(
     title="Sentinelle Fraud Detection API",
     description="API backend pour la détection de fraude bancaire",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # CORS configuration
@@ -28,6 +39,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth.router)
 
 # Configuration ML Engine
 ML_ENGINE_URL = os.getenv("ML_ENGINE_URL", "http://localhost:8080")  # À configurer avec l'URL Cloud Run
