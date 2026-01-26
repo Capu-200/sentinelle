@@ -38,6 +38,13 @@ export async function registerAction(prevState: any, formData: FormData) {
 
         if (!res.ok) {
             const errorData = await res.json();
+            // Handle FastAPI validation error array
+            if (Array.isArray(errorData.detail)) {
+                const messages = errorData.detail.map((err: any) =>
+                    `${err.loc[1] || 'Champ'}: ${err.msg}`
+                ).join('. ');
+                return { error: messages };
+            }
             return { error: errorData.detail || "Erreur lors de l'inscription" };
         }
 

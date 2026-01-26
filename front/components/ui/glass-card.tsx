@@ -22,7 +22,7 @@ export const GlassCard = ({ children, className, gradient = false, ...props }: G
                 <div className="absolute inset-0 z-0 bg-white/5 opacity-50" style={{ backgroundImage: "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDUiLz4KPC9zdmc+') " }} />
             )}
 
-            <div className="relative z-10">
+            <div className="relative z-10 h-full w-full flex-1">
                 {children}
             </div>
         </div>

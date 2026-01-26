@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 from ..database import get_db
-from ..models import User
+from ..models import User, Wallet
 from ..schemas import UserCreate, UserLogin, Token
 from ..auth import get_password_hash, verify_password, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from datetime import timedelta
+import uuid
 
 router = APIRouter(
     prefix="/auth",
@@ -23,14 +24,37 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         )
     
     # Create new user
+    user_id = str(uuid.uuid4())
     hashed_password = get_password_hash(user.password)
+    
     new_user = User(
+        user_id=user_id,
         email=user.email,
         hashed_password=hashed_password,
-        full_name=user.full_name
+        full_name=user.full_name,
+        display_name=user.full_name.split(" ")[0] if user.full_name else "User",
+        risk_level="LOW",
+        trust_score=100
     )
     db.add(new_user)
-    db.commit()
+    
+    # Create default wallet
+    wallet_id = str(uuid.uuid4())
+    new_wallet = Wallet(
+        wallet_id=wallet_id,
+        user_id=user_id,
+        currency="EUR",
+        balance=1000.00, # Welcome bonus / Initial balance check
+        kyc_status="VERIFIED"
+    )
+    db.add(new_wallet)
+    
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+        
     db.refresh(new_user)
     
     # Generate token

@@ -17,13 +17,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import text
 from contextlib import asynccontextmanager
-from sqlmodel import SQLModel, select, Session
+from sqlmodel import SQLModel, select
 
 from app.database import get_db, engine
 from .routers import auth, dashboard
-from .auth import get_current_user
-from .models import User, Transaction, Wallet
-from .schemas import TransactionResponseLite 
+from .models import User, Transaction, Wallet 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
