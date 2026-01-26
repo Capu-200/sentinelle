@@ -5,10 +5,23 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from contextlib import asynccontextmanager
+from sqlmodel import SQLModel
+from .database import engine
+from .routers import auth
+from .models import User  # Import models to register them with metadata
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Create tables on startup
+    SQLModel.metadata.create_all(engine)
+    yield
+
 app = FastAPI(
     title="Sentinelle Fraud Detection API",
     description="API backend pour la détection de fraude bancaire",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # CORS configuration
@@ -19,6 +32,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth.router)
 
 @app.get("/")
 async def root():
@@ -33,7 +48,4 @@ async def root():
 async def health():
     """Health check endpoint"""
     return {"status": "healthy"}
-
-# Les routes seront ajoutées ici
-# TODO: Ajouter les routes pour users, accounts, transactions, predictions, etc.
 
