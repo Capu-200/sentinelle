@@ -171,7 +171,7 @@ def compute_historical_aggregates(
             days_diff = (tx_created_at - last_tx_date).total_seconds() / 86400
             features["days_since_last_src_to_dst"] = float(days_diff)
         else:
-            features["days_since_last_src_to_dst"] = None  # Pas d'historique
+            features["days_since_last_src_to_dst"] = -1.0  # Pas d'historique (-1 = jamais)
     else:
         # Pas de destination → valeurs par défaut
         for window in ["24h", "7d", "30d"]:
@@ -304,7 +304,7 @@ def _get_empty_historical_features(windows: List[str]) -> Dict[str, Any]:
     for window in ["24h", "7d", "30d"]:
         features[f"is_new_destination_{window}"] = 1  # Nouveau par défaut
     features["src_to_dst_tx_count_30d"] = 0
-    features["days_since_last_src_to_dst"] = None
+    features["days_since_last_src_to_dst"] = -1.0  # -1 = jamais vu
     
     # Dispersion
     features["src_destination_concentration_7d"] = 0.0

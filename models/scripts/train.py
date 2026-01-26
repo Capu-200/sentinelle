@@ -29,6 +29,34 @@ from src.features.training import compute_features_for_dataset
 from src.models.supervised.train import train_supervised_model
 from src.models.unsupervised.train import train_unsupervised_model
 from src.utils.versioning import save_artifacts
+from src.scoring.scorer import GlobalScorer
+
+
+def _convert_features_to_numeric(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Convertit toutes les colonnes du DataFrame en types numériques (int, float, bool).
+    
+    LightGBM n'accepte que ces types. Les colonnes object sont converties :
+    - Si booléennes → bool
+    - Sinon → float (avec gestion des NaN)
+    """
+    df_converted = df.copy()
+    
+    for col in df_converted.columns:
+        dtype = df_converted[col].dtype
+        
+        if dtype == 'object':
+            # Essayer de convertir en bool d'abord
+            if df_converted[col].isin([True, False, 'True', 'False', 1, 0, '1', '0']).all():
+                df_converted[col] = df_converted[col].astype(bool)
+            else:
+                # Convertir en float (les NaN resteront NaN, mais LightGBM les gère)
+                df_converted[col] = pd.to_numeric(df_converted[col], errors='coerce').fillna(0.0)
+        elif dtype.name.startswith('datetime'):
+            # Les dates doivent être converties en features numériques (ex: timestamp)
+            df_converted[col] = pd.to_numeric(df_converted[col], errors='coerce').fillna(0.0)
+    
+    return df_converted
 
 
 def main():
@@ -73,6 +101,12 @@ def main():
         type=str,
         help="Date de fin du set de validation (ISO format)",
     )
+    parser.add_argument(
+        "--test-size",
+        type=int,
+        default=None,
+        help="Mode test: limiter PaySim aux N transactions les plus récentes (pour tests rapides)",
+    )
 
     args = parser.parse_args()
 
@@ -97,14 +131,49 @@ def main():
     paysim_df["created_at"] = pd.to_datetime(paysim_df["created_at"], utc=True)
     print(f"   ✅ {len(paysim_df)} transactions chargées")
     
-    # Split temporel PaySim
-    print(f"\n📊 Split temporel PaySim...")
-    paysim_train, paysim_val, paysim_test = prepare_training_data(
-        paysim_path,
-        train_ratio=0.7,
-        val_ratio=0.15,
-        test_ratio=0.15,
-    )
+    # Mode test : limiter aux N transactions les plus récentes
+    if args.test_size is not None:
+        print(f"\n🧪 MODE TEST: Limitation à {args.test_size:,} transactions les plus récentes")
+        # Trier par date (plus récentes en dernier) et prendre les N dernières
+        paysim_df = paysim_df.sort_values("created_at").tail(args.test_size).reset_index(drop=True)
+        print(f"   ✅ Dataset limité à {len(paysim_df):,} transactions")
+        print(f"   📅 Période: {paysim_df['created_at'].min()} → {paysim_df['created_at'].max()}")
+        
+        # Split temporel directement sur le DataFrame limité (pas de rechargement)
+        print(f"\n📊 Split temporel PaySim (sur dataset limité)...")
+        paysim_df = paysim_df.sort_values("created_at").reset_index(drop=True)
+        n_total = len(paysim_df)
+        n_train = int(n_total * 0.7)
+        n_val = int(n_total * 0.15)
+        
+        paysim_train = paysim_df.iloc[:n_train].copy()
+        paysim_val = paysim_df.iloc[n_train:n_train + n_val].copy()
+        paysim_test = paysim_df.iloc[n_train + n_val:].copy()
+        
+        print(f"📊 Split temporel:")
+        print(f"   Train: {len(paysim_train)} transactions ({len(paysim_train)/n_total*100:.1f}%)")
+        print(f"      Période: {paysim_train['created_at'].min()} → {paysim_train['created_at'].max()}")
+        print(f"   Val:   {len(paysim_val)} transactions ({len(paysim_val)/n_total*100:.1f}%)")
+        print(f"      Période: {paysim_val['created_at'].min()} → {paysim_val['created_at'].max()}")
+        print(f"   Test:  {len(paysim_test)} transactions ({len(paysim_test)/n_total*100:.1f}%)")
+        print(f"      Période: {paysim_test['created_at'].min()} → {paysim_test['created_at'].max()}")
+        
+        # Vérifier le leakage temporel
+        if paysim_train["created_at"].max() >= paysim_val["created_at"].min():
+            print("⚠️  LEAKAGE TEMPOREL DÉTECTÉ: Train max >= Val min")
+        elif paysim_val["created_at"].max() >= paysim_test["created_at"].min():
+            print("⚠️  LEAKAGE TEMPOREL DÉTECTÉ: Val max >= Test min")
+        else:
+            print("   ✅ Aucun leakage temporel détecté")
+    else:
+        # Split temporel PaySim (mode normal, utilise prepare_training_data)
+        print(f"\n📊 Split temporel PaySim...")
+        paysim_train, paysim_val, paysim_test = prepare_training_data(
+            paysim_path,
+            train_ratio=0.7,
+            val_ratio=0.15,
+            test_ratio=0.15,
+        )
     
     # Dataset Payon Legit (non supervisé)
     payon_path = args.data_dir / "payon_legit_clean.csv"
@@ -215,6 +284,11 @@ def main():
         print(f"📊 Entraînement sur {len(paysim_train_features)} transactions")
         print(f"   Fraudes: {paysim_train_labels.sum()} ({paysim_train_labels.mean()*100:.2f}%)")
         
+        # Convertir toutes les colonnes en types numériques (LightGBM n'accepte que int, float, bool)
+        print("🔧 Conversion des types de features pour LightGBM...")
+        paysim_train_features = _convert_features_to_numeric(paysim_train_features)
+        paysim_val_features = _convert_features_to_numeric(paysim_val_features)
+        
         supervised_model = train_supervised_model(
             train_data=paysim_train_features,
             train_labels=paysim_train_labels,
@@ -230,6 +304,11 @@ def main():
     print("=" * 60)
     
     print(f"📊 Entraînement sur {len(payon_train_features)} transactions (normales uniquement)")
+    
+    # Convertir toutes les colonnes en types numériques
+    print("🔧 Conversion des types de features pour IsolationForest...")
+    payon_train_features = _convert_features_to_numeric(payon_train_features)
+    # Note: val_data n'est pas utilisé pour IsolationForest (modèle non supervisé)
     
     unsupervised_model = train_unsupervised_model(
         train_data=payon_train_features,
@@ -248,17 +327,61 @@ def main():
     else:
         supervised_scores = None
     
+    # Pour le score non supervisé, on utilise Payon val (transactions normales)
     unsupervised_scores = unsupervised_model.predict(payon_val_features)
     
-    # Calculer les seuils (top 0.1% BLOCK, top 1% REVIEW)
-    if supervised_scores is not None:
-        # Utiliser le score supervisé pour les seuils
-        block_threshold = supervised_scores.quantile(0.999)  # Top 0.1%
-        review_threshold = supervised_scores.quantile(0.99)  # Top 1%
+    # Calculer le SCORE GLOBAL (comme en production) pour calibrer les seuils
+    # Le score global combine : règles (20%) + supervisé (60%) + non supervisé (20%)
+    global_scorer = GlobalScorer()
+    
+    if supervised_scores is not None and len(supervised_scores) > 0:
+        # Calculer le score global pour chaque transaction du validation set
+        # Pour la calibration, on simule rule_score=0 (pas de règles déclenchées)
+        # et on combine supervisé + non supervisé
+        min_len = min(len(supervised_scores), len(unsupervised_scores))
+        supervised_scores_aligned = supervised_scores.iloc[:min_len]
+        unsupervised_scores_aligned = unsupervised_scores.iloc[:min_len]
+        
+        global_scores = []
+        for i in range(min_len):
+            global_score = global_scorer.compute_score(
+                rule_score=0.0,  # Pas de règles pour la calibration
+                supervised_score=float(supervised_scores_aligned.iloc[i]),
+                unsupervised_score=float(unsupervised_scores_aligned.iloc[i]),
+                boost_factor=1.0,
+            )
+            global_scores.append(global_score)
+        
+        global_scores_series = pd.Series(global_scores)
+        
+        # Calculer les seuils sur le score global (top 0.1% BLOCK, top 1% REVIEW)
+        block_threshold = global_scores_series.quantile(0.999)  # Top 0.1%
+        review_threshold = global_scores_series.quantile(0.99)  # Top 1%
+        
+        print(f"📊 Scores calculés sur {len(global_scores_series)} transactions")
+        print(f"   Score global min: {global_scores_series.min():.4f}")
+        print(f"   Score global max: {global_scores_series.max():.4f}")
+        print(f"   Score global médian: {global_scores_series.median():.4f}")
     else:
-        # Utiliser le score non supervisé
+        # Fallback : utiliser le score non supervisé uniquement
+        print("⚠️  Pas de modèle supervisé, utilisation du score non supervisé uniquement")
         block_threshold = unsupervised_scores.quantile(0.999)
         review_threshold = unsupervised_scores.quantile(0.99)
+    
+    # Si les seuils sont identiques (dataset trop petit), ajuster
+    if abs(block_threshold - review_threshold) < 0.001:
+        print("⚠️  Seuils identiques détectés (dataset petit), ajustement...")
+        # Utiliser des quantiles plus espacés
+        if supervised_scores is not None and len(supervised_scores) > 0:
+            review_threshold = global_scores_series.quantile(0.99)
+            block_threshold = global_scores_series.quantile(0.995)  # Top 0.5% au lieu de 0.1%
+        else:
+            review_threshold = unsupervised_scores.quantile(0.99)
+            block_threshold = unsupervised_scores.quantile(0.995)
+        
+        # S'assurer que BLOCK > REVIEW
+        if block_threshold <= review_threshold:
+            block_threshold = review_threshold + 0.01  # Ajouter un petit écart
     
     thresholds = {
         "block_threshold": float(block_threshold),
@@ -266,8 +389,10 @@ def main():
     }
     
     print(f"✅ Seuils calculés:")
-    print(f"   BLOCK threshold: {block_threshold:.4f}")
-    print(f"   REVIEW threshold: {review_threshold:.4f}")
+    print(f"   BLOCK threshold: {block_threshold:.4f} (top 0.1-0.5%)")
+    print(f"   REVIEW threshold: {review_threshold:.4f} (top 1%)")
+    print(f"   💡 En production, une transaction avec score ≥ {block_threshold:.4f} sera BLOCK")
+    print(f"   💡 En production, une transaction avec score ≥ {review_threshold:.4f} sera REVIEW")
     
     # ========== 6. SAUVEGARDE DES ARTEFACTS ==========
     print("\n" + "=" * 60)

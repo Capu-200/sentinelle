@@ -125,7 +125,8 @@ class FeaturePipeline:
                 elif "concentration" in key or "ratio" in key or "entropy" in key:
                     handled_features[key] = 0.0
                 elif "days_since" in key:
-                    handled_features[key] = None  # Garder null pour "jamais"
+                    # Convertir None en -1.0 pour indiquer "jamais" (LightGBM n'accepte pas None/object)
+                    handled_features[key] = -1.0
                 else:
                     # Par défaut : 0
                     handled_features[key] = 0
