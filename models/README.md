@@ -83,6 +83,30 @@ Retourne {risk_score, decision, reasons}
 
 ---
 
+### 🧪 [05_POSTMAN_TESTS.md](05_POSTMAN_TESTS.md)
+**Pour** : Tester le ML Engine avec Postman
+
+- Cas de test complets : Health check, APPROVE, REVIEW, BLOCK, new user, erreur 400
+- Body JSON prêts à l’emploi pour chaque scénario
+- Dépannage (404, 400, 422, 500, timeout)
+- Référence décisions et seuils
+
+**Quand l'utiliser** : Pour valider l’API en local ou après déploiement
+
+---
+
+### 📊 [06_MONITORING_VERTEX.md](06_MONITORING_VERTEX.md)
+**Pour** : Monitorer le modèle en production avec Vertex AI (GCS)
+
+- Logging des inferences vers GCS (variables d’env Cloud Run)
+- Export baseline optionnel depuis l’entraînement
+- Script Vertex : reference model + Model Monitor
+- Lancer des jobs (Run now, Schedule)
+
+**Quand l'utiliser** : Pour configurer le monitoring drift/qualité du modèle (source GCS uniquement)
+
+---
+
 ## 🚀 Quick Start
 
 ### 1. Entraîner un modèle
@@ -177,6 +201,8 @@ models/
 - **Modifier les règles ?** → Voir [02_REGLES.md](02_REGLES.md)
 - **Intégrer l'API ?** → Voir [03_SCORING.md](03_SCORING.md)
 - **Déployer en production ?** → Voir [04_DEPLOIEMENT.md](04_DEPLOIEMENT.md)
+- **Tester avec Postman ?** → Voir [05_POSTMAN_TESTS.md](05_POSTMAN_TESTS.md)
+- **Monitorer le modèle (Vertex, GCS) ?** → Voir [06_MONITORING_VERTEX.md](06_MONITORING_VERTEX.md)
 
 ---
 
