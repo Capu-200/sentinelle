@@ -77,6 +77,7 @@ export default async function Home() {
     recipient: t.recipient_name || "Inconnu",
     status: t.status as TransactionStatus,
     date: t.created_at,
+    direction: t.direction as 'INCOMING' | 'OUTGOING' // Explicitly map direction
   }));
 
   const formatCurrency = (amount: number, currency: string) => {

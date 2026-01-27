@@ -42,7 +42,7 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # En production, spécifier les origines autorisées
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],  # Restricted to Frontend URLs
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -73,6 +73,7 @@ class TransactionRequest(BaseModel):
     city: Optional[str] = None
     description: Optional[str] = None
     initiator_user_id: Optional[str] = None # Added for linking to user
+    recipient_email: Optional[str] = None # Added for resolving destination wallet
 
 
 class TransactionResponse(BaseModel):
@@ -313,12 +314,21 @@ async def get_transactions(
 ):
     """
     Récupère l'historique des transactions de l'utilisateur connecté.
+    (Initiateur OU Destinataire)
     """
+    user_wallets_stmt = select(Wallet.wallet_id).where(Wallet.user_id == current_user.user_id)
+    user_wallet_ids = db.execute(user_wallets_stmt).scalars().all()
+    
+    # Fail safe if user has no wallet yet
+    if not user_wallet_ids:
+        user_wallet_ids = []
+
     stmt = (
         select(Transaction)
         .where(
             (Transaction.initiator_user_id == current_user.user_id) |
-            (Transaction.source_wallet_id.in_(select(Wallet.wallet_id).where(Wallet.user_id == current_user.user_id)))
+            (Transaction.source_wallet_id.in_(user_wallet_ids)) |
+            (Transaction.destination_wallet_id.in_(user_wallet_ids))
         )
         .order_by(Transaction.created_at.desc())
         .offset(skip)
@@ -332,7 +342,7 @@ async def get_transactions(
             amount=float(tx.amount),
             currency=tx.currency,
             transaction_type=tx.transaction_type,
-            direction=tx.direction,
+            direction="INCOMING" if tx.destination_wallet_id in user_wallet_ids and tx.source_wallet_id not in user_wallet_ids else tx.direction,
             status=tx.kyc_status,
             recipient_name=tx.description or "Destinataire Inconnu",
             created_at=tx.created_at
@@ -352,6 +362,21 @@ async def create_transaction(
     transaction_id = transaction_req.transaction_id or str(uuid.uuid4())
     current_time = datetime.utcnow()
     
+    # 0. Résolution du Wallet de Destination (si email fourni)
+    destination_wallet_id = transaction_req.destination_wallet_id
+    if not destination_wallet_id and transaction_req.recipient_email:
+        # Chercher l'utilisateur par email (Normalisé)
+        dest_email = transaction_req.recipient_email.lower()
+        dest_user_stmt = select(User).where(User.email == dest_email)
+        dest_user = db.execute(dest_user_stmt).scalars().first()
+        
+        if dest_user:
+            # Chercher son wallet (le premier pour l'instant)
+            dest_wallet_stmt = select(Wallet).where(Wallet.user_id == dest_user.user_id)
+            dest_wallet = db.execute(dest_wallet_stmt).scalars().first()
+            if dest_wallet:
+                destination_wallet_id = dest_wallet.wallet_id
+
     # 1. Vérification Solde (Pre-check)
     if transaction_req.direction == "OUTGOING":
         source_wallet = db.get(Wallet, transaction_req.source_wallet_id)
@@ -366,7 +391,7 @@ async def create_transaction(
         amount=Decimal(str(transaction_req.amount)),
         currency=transaction_req.currency,
         source_wallet_id=transaction_req.source_wallet_id,
-        destination_wallet_id=transaction_req.destination_wallet_id,
+        destination_wallet_id=destination_wallet_id, # Utilisation de l'ID résolu
         transaction_type=transaction_req.transaction_type,
         direction=transaction_req.direction,
         country=transaction_req.country,

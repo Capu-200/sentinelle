@@ -14,8 +14,11 @@ router = APIRouter(
 
 @router.post("/register", response_model=Token)
 def register(user: UserCreate, db: Session = Depends(get_db)):
+    # Normalize email
+    normalized_email = user.email.lower()
+    
     # Check if user exists
-    statement = select(User).where(User.email == user.email)
+    statement = select(User).where(User.email == normalized_email)
     existing_user = db.execute(statement).scalars().first()
     if existing_user:
         raise HTTPException(
@@ -29,7 +32,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     
     new_user = User(
         user_id=user_id,
-        email=user.email,
+        email=normalized_email,
         hashed_password=hashed_password,
         full_name=user.full_name,
         display_name=user.full_name.split(" ")[0] if user.full_name else "User",
@@ -66,7 +69,8 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
-    statement = select(User).where(User.email == user_credentials.email)
+    normalized_email = user_credentials.email.lower()
+    statement = select(User).where(User.email == normalized_email)
     user = db.execute(statement).scalars().first()
     
     if not user or not verify_password(user_credentials.password, user.hashed_password):

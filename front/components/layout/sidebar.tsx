@@ -61,16 +61,13 @@ export const Sidebar = () => {
 
             {/* User Footer */}
             <div className="p-4 border-t border-slate-200 dark:border-slate-800">
-                <button
-                    onClick={() => {
-                        document.cookie = "auth-token=; path=/; max-age=0";
-                        window.location.href = "/login";
-                    }}
-                    className="flex items-center gap-3 w-full px-4 py-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 text-muted-foreground hover:text-red-600 transition-colors group"
+                <Link
+                    href="/profile"
+                    className="flex items-center gap-3 w-full px-4 py-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-muted-foreground hover:text-foreground transition-colors group"
                 >
-                    <LogOut className="h-5 w-5" />
-                    <span className="text-sm font-medium">Déconnexion</span>
-                </button>
+                    <Settings className="h-5 w-5" />
+                    <span className="text-sm font-medium">Mon Profil</span>
+                </Link>
             </div>
         </aside>
     );

@@ -53,7 +53,7 @@ export async function registerAction(prevState: any, formData: FormData) {
         cookieStore.set("auth-token", access_token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
-            maxAge: 60 * 60 * 24, // 1 day
+            maxAge: 60 * 60 * 24 * 7, // 7 days
             path: "/",
         });
     } catch (err) {
@@ -91,7 +91,7 @@ export async function loginAction(prevState: any, formData: FormData) {
         cookieStore.set("auth-token", access_token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
-            maxAge: 60 * 60 * 24, // 1 day
+            maxAge: 60 * 60 * 24 * 7, // 7 days
             path: "/",
         });
     } catch (err) {
@@ -100,4 +100,10 @@ export async function loginAction(prevState: any, formData: FormData) {
     }
 
     redirect("/");
+}
+
+export async function logoutAction() {
+    const cookieStore = await cookies();
+    cookieStore.delete("auth-token");
+    redirect("/login");
 }
