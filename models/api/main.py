@@ -10,7 +10,7 @@ import os
 import sys
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel
 
 # Ajouter le répertoire parent au PYTHONPATH
@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.features.pipeline import FeaturePipeline
 from src.models.supervised.predictor import SupervisedPredictor
 from src.models.unsupervised.predictor import UnsupervisedPredictor
+from src.monitoring.gcs_logger import log_inference_to_gcs
 from src.rules.engine import RulesEngine
 from src.scoring.decision import DecisionEngine
 from src.scoring.scorer import GlobalScorer
@@ -103,7 +104,7 @@ def _require_enriched_transaction(transaction: dict) -> None:
 
 
 @app.post("/score", response_model=ScoreResponse)
-async def score_transaction(request: ScoreRequest):
+async def score_transaction(request: ScoreRequest, background_tasks: BackgroundTasks):
     """
     Score une transaction.
     
@@ -125,8 +126,15 @@ async def score_transaction(request: ScoreRequest):
     # 2. Règles métier
     rules_output = rules_engine.evaluate(transaction, features, context)
     
-    # Si BLOCK, arrêter ici
+    # Si BLOCK, arrêter ici (logging Vertex en arrière-plan)
     if rules_output.decision == "BLOCK":
+        background_tasks.add_task(
+            log_inference_to_gcs,
+            features,
+            float(rules_output.rule_score),
+            "BLOCK",
+            MODEL_VERSION,
+        )
         return ScoreResponse(
             risk_score=rules_output.rule_score,
             decision="BLOCK",
@@ -160,7 +168,16 @@ async def score_transaction(request: ScoreRequest):
         hard_block=False,
         model_version=MODEL_VERSION,
     )
-    
+
+    # Logging Vertex (GCS) en arrière-plan
+    background_tasks.add_task(
+        log_inference_to_gcs,
+        features,
+        decision.risk_score,
+        decision.decision,
+        MODEL_VERSION,
+    )
+
     return ScoreResponse(
         risk_score=decision.risk_score,
         decision=decision.decision,

@@ -408,7 +408,24 @@ def main():
         latest_path.unlink()
     latest_path.symlink_to(f"v{args.version}")
     print(f"✅ Symlink 'latest' → v{args.version}")
-    
+
+    # Export baseline Vertex (optionnel) : features d'entraînement vers GCS
+    export_bucket = os.getenv("EXPORT_BASELINE_GCS_BUCKET", "").strip()
+    if export_bucket:
+        try:
+            from google.cloud import storage
+            baseline_df = payon_train_features  # distribution "normale" pour drift
+            buf = baseline_df.to_json(orient="records", lines=True, date_format="iso")
+            prefix = "monitoring/baseline"
+            blob_name = f"{prefix}/v{args.version}/train_features.jsonl"
+            client = storage.Client()
+            bucket = client.bucket(export_bucket)
+            blob = bucket.blob(blob_name)
+            blob.upload_from_string(buf, content_type="application/json")
+            print(f"✅ Baseline Vertex exportée: gs://{export_bucket}/{blob_name}")
+        except Exception as e:
+            print(f"⚠️  Export baseline GCS ignoré: {e}")
+
     # ========== RÉSUMÉ ==========
     print("\n" + "=" * 60)
     print("✅ ENTRAÎNEMENT TERMINÉ")
