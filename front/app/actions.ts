@@ -62,8 +62,8 @@ export async function createTransferAction(formData: FormData) {
         transaction_type: "TRANSFER",
         direction: "OUTGOING",
         initiator_user_id: userId,
-        description: `Virement vers ${recipient}`, // Store recipient name here for now
-        // destination_wallet_id: null, // Left empty for external/unresolved
+        description: `Virement à ${recipient}`,
+        recipient_email: recipient, // Send email to backend for wallet resolution
         city: "Paris", // Default for MVP
         country: "FR"  // Default for MVP
     };

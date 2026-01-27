@@ -1,158 +1,100 @@
-'use client';
+import { logoutAction } from "@/app/actions/auth";
+import { ArrowLeft, User, Shield, Key } from "lucide-react";
+import Link from "next/link";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { GlassCard } from "@/components/ui/glass-card";
 
-import { useState } from 'react';
-import { mockProfile } from '@/lib/mock-data';
-import Card from '@/components/ui/Card';
-import Badge from '@/components/ui/Badge';
-import Button from '@/components/ui/Button';
-import { BuildingLibraryIcon, CreditCardIcon } from '@heroicons/react/24/outline';
+async function getUserProfile() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("auth-token");
 
-export default function ProfilePage() {
-  const [profile] = useState(mockProfile);
-  
-  const getKYCStatus = (status: typeof profile.kycStatus) => {
-    switch (status) {
-      case 'verified':
-        return {
-          badge: <Badge variant="success">Vérifié</Badge>,
-          message: 'Votre identité a été vérifiée',
-        };
-      case 'pending':
-        return {
-          badge: <Badge variant="warning">En attente</Badge>,
-          message: 'Vérification en cours',
-        };
-      case 'unverified':
-        return {
-          badge: <Badge variant="error">Non vérifié</Badge>,
-          message: 'Vérification requise',
-        };
+  if (!token) {
+    redirect("/login");
+  }
+
+  try {
+    const res = await fetch("http://127.0.0.1:8000/dashboard/", {
+      headers: {
+        "Authorization": `Bearer ${token.value}`,
+      },
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      return null;
     }
-  };
-  
-  const kycInfo = getKYCStatus(profile.kycStatus);
-  
+
+    return await res.json();
+  } catch (error) {
+    return null; // Handle error appropriately
+  }
+}
+
+
+export default async function ProfilePage() {
+  const data = await getUserProfile();
+
+  if (!data) {
+    redirect("/login");
+  }
+
+  const { user } = data;
+
   return (
-    <div className="min-h-screen pb-20">
-      <main className="px-4 py-6 space-y-6">
-        {/* Profile Header */}
-        <Card className="text-center py-6">
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-orange-400 to-blue-400 flex items-center justify-center text-white text-2xl font-semibold mx-auto mb-4">
-            {profile.name.charAt(0)}
+    <div className="max-w-md mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <Link href="/" className="rounded-full p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <ArrowLeft className="h-6 w-6" />
+        </Link>
+        <h1 className="text-2xl font-bold">Mon Profil</h1>
+      </div>
+
+      <GlassCard className="p-8 space-y-6">
+        <div className="flex flex-col items-center">
+          <div className="h-24 w-24 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4 ring-4 ring-white dark:ring-slate-900 shadow-xl">
+            <User className="h-12 w-12 text-slate-400" />
           </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-1">{profile.name}</h2>
-          <p className="text-sm text-gray-500">{profile.email}</p>
-        </Card>
-        
-        {/* KYC Status */}
-        <Card>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-semibold text-gray-900">Vérification d'identité</h3>
-            {kycInfo.badge}
-          </div>
-          <p className="text-sm text-gray-600 mb-4">{kycInfo.message}</p>
-          {profile.kycStatus !== 'verified' && (
-            <Button variant="primary" size="sm" className="w-full">
-              Compléter la vérification
-            </Button>
-          )}
-        </Card>
-        
-        {/* Payment Methods */}
-        <div>
-          <h3 className="font-semibold text-gray-900 mb-3">Moyens de paiement</h3>
-          <div className="space-y-2">
-            {profile.paymentMethods.map((method) => (
-              <Card key={method.id} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-100 to-blue-100 flex items-center justify-center">
-                    {method.type === 'iban' ? (
-                      <BuildingLibraryIcon className="w-6 h-6 text-orange-600" />
-                    ) : (
-                      <CreditCardIcon className="w-6 h-6 text-blue-600" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900">{method.label}</div>
-                    <div className="text-xs text-gray-500">
-                      {method.type === 'iban' ? 'Compte bancaire' : 'Carte bancaire'}
-                    </div>
-                  </div>
-                </div>
-                <button className="text-gray-400">→</button>
-              </Card>
-            ))}
-          </div>
-          <Button variant="outline" size="md" className="w-full mt-3">
-            Ajouter un moyen de paiement
-          </Button>
+          <h2 className="text-xl font-bold">{user.full_name}</h2>
+          <p className="text-sm text-muted-foreground">{user.email}</p>
         </div>
-        
-        {/* Security Settings */}
-        <div>
-          <h3 className="font-semibold text-gray-900 mb-3">Sécurité</h3>
-          <Card className="space-y-4">
-            <button className="flex items-center justify-between w-full text-left">
-              <div>
-                <div className="font-semibold text-gray-900">Code PIN</div>
-                <div className="text-sm text-gray-500">Modifier votre code PIN</div>
+
+        <div className="space-y-4 pt-4">
+          <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
+                <Shield className="h-5 w-5" />
               </div>
-              <span className="text-gray-400">→</span>
-            </button>
-            
-            <div className="border-t border-gray-100 pt-4">
-              <button className="flex items-center justify-between w-full text-left">
-                <div>
-                  <div className="font-semibold text-gray-900">Authentification à deux facteurs</div>
-                  <div className="text-sm text-gray-500">Activer la 2FA</div>
-                </div>
-                <span className="text-gray-400">→</span>
-              </button>
-            </div>
-            
-            <div className="border-t border-gray-100 pt-4">
-              <button className="flex items-center justify-between w-full text-left">
-                <div>
-                  <div className="font-semibold text-gray-900">Notifications de sécurité</div>
-                  <div className="text-sm text-gray-500">Gérer les alertes</div>
-                </div>
-                <span className="text-gray-400">→</span>
-              </button>
-            </div>
-          </Card>
-        </div>
-        
-        {/* GDPR & Data */}
-        <div>
-          <h3 className="font-semibold text-gray-900 mb-3">Données personnelles</h3>
-          <Card className="space-y-4">
-            <button className="flex items-center justify-between w-full text-left">
               <div>
-                <div className="font-semibold text-gray-900">Exporter mes données</div>
-                <div className="text-sm text-gray-500">Télécharger une copie de vos données</div>
+                <p className="font-medium text-sm">Niveau de risque</p>
+                <p className="text-xs text-muted-foreground">Analysé par IA</p>
               </div>
-              <span className="text-gray-400">→</span>
-            </button>
-            
-            <div className="border-t border-gray-100 pt-4">
-              <button className="flex items-center justify-between w-full text-left text-red-600">
-                <div>
-                  <div className="font-semibold">Supprimer mon compte</div>
-                  <div className="text-sm opacity-75">Supprimer définitivement votre compte</div>
-                </div>
-                <span className="text-red-400">→</span>
-              </button>
             </div>
-          </Card>
+            <span className="font-bold text-sm px-2 py-1 rounded-md bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+              {user.risk_level}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                <Key className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-medium text-sm">ID Utilisateur</p>
+                <p className="text-xs text-muted-foreground font-mono truncate max-w-[150px]">{user.user_id}</p>
+              </div>
+            </div>
+          </div>
         </div>
-        
-        {/* App Info */}
-        <div className="text-center text-xs text-gray-400 py-4">
-          <p>Sentinelle v1.0.0</p>
-          <p className="mt-1">Sécurisé par intelligence artificielle</p>
-        </div>
-      </main>
+
+        <form action={logoutAction} className="pt-6">
+          <button className="w-full py-3 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 dark:text-red-400 font-medium transition-colors">
+            Se déconnecter
+          </button>
+        </form>
+      </GlassCard>
     </div>
   );
 }
-

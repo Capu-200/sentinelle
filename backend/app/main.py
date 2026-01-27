@@ -22,7 +22,8 @@ from sqlmodel import SQLModel, select, Session
 from app.database import get_db, engine
 from .routers import auth, dashboard
 from .auth import get_current_user
-from .models import User, Transaction, Wallet
+from decimal import Decimal
+from .models import User, Transaction, Wallet, WalletLedger
 from .schemas import TransactionResponseLite 
 
 @asynccontextmanager
@@ -41,7 +42,7 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # En production, spécifier les origines autorisées
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],  # Restricted to Frontend URLs
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -72,6 +73,7 @@ class TransactionRequest(BaseModel):
     city: Optional[str] = None
     description: Optional[str] = None
     initiator_user_id: Optional[str] = None # Added for linking to user
+    recipient_email: Optional[str] = None # Added for resolving destination wallet
 
 
 class TransactionResponse(BaseModel):
@@ -226,6 +228,49 @@ async def save_ai_decision(
     # However, if save_transaction also commits, we should be careful.
 
 
+
+# ========== LOGIQUE LEDGER ==========
+
+def execute_balance_movement(
+    db: Session,
+    wallet_id: str,
+    amount: float,
+    transaction_id: str,
+    entry_type: str, # DEBIT or CREDIT
+) -> float:
+    """Met à jour le solde d'un wallet et crée une entrée ledger."""
+    wallet = db.get(Wallet, wallet_id)
+    if not wallet:
+        raise ValueError(f"Wallet {wallet_id} introuvable")
+    
+    amount_decimal = Decimal(str(amount))
+    
+    if entry_type == "DEBIT":
+        if wallet.balance < amount_decimal:
+            raise ValueError("Solde insuffisant")
+        wallet.balance -= amount_decimal
+    elif entry_type == "CREDIT":
+        wallet.balance += amount_decimal
+    
+    wallet.updated_at = datetime.utcnow()
+    wallet.last_transaction_at = datetime.utcnow()
+    db.add(wallet)
+    
+    # Créer entrée Ledger
+    ledger_entry = WalletLedger(
+        ledger_id=str(uuid.uuid4()),
+        wallet_id=wallet_id,
+        transaction_id=transaction_id,
+        entry_type=entry_type,
+        amount=amount_decimal,
+        balance_after=wallet.balance,
+        executed_at=datetime.utcnow()
+    )
+    db.add(ledger_entry)
+    
+    return float(wallet.balance)
+
+
 # ========== ROUTES ==========
 
 @app.get("/")
@@ -269,12 +314,21 @@ async def get_transactions(
 ):
     """
     Récupère l'historique des transactions de l'utilisateur connecté.
+    (Initiateur OU Destinataire)
     """
+    user_wallets_stmt = select(Wallet.wallet_id).where(Wallet.user_id == current_user.user_id)
+    user_wallet_ids = db.execute(user_wallets_stmt).scalars().all()
+    
+    # Fail safe if user has no wallet yet
+    if not user_wallet_ids:
+        user_wallet_ids = []
+
     stmt = (
         select(Transaction)
         .where(
             (Transaction.initiator_user_id == current_user.user_id) |
-            (Transaction.source_wallet_id.in_(select(Wallet.wallet_id).where(Wallet.user_id == current_user.user_id)))
+            (Transaction.source_wallet_id.in_(user_wallet_ids)) |
+            (Transaction.destination_wallet_id.in_(user_wallet_ids))
         )
         .order_by(Transaction.created_at.desc())
         .offset(skip)
@@ -288,7 +342,7 @@ async def get_transactions(
             amount=float(tx.amount),
             currency=tx.currency,
             transaction_type=tx.transaction_type,
-            direction=tx.direction,
+            direction="INCOMING" if tx.destination_wallet_id in user_wallet_ids and tx.source_wallet_id not in user_wallet_ids else tx.direction,
             status=tx.kyc_status,
             recipient_name=tx.description or "Destinataire Inconnu",
             created_at=tx.created_at
@@ -299,50 +353,68 @@ async def get_transactions(
 @app.post("/transactions", response_model=TransactionResponse)
 async def create_transaction(
     transaction_req: TransactionRequest,
-    db = Depends(get_db)
+    db: Session = Depends(get_db)
 ):
     """
     Crée une transaction et la score via le ML Engine.
+    Met à jour les soldes si APPROVE.
     """
-    # Générer transaction_id si non fourni
     transaction_id = transaction_req.transaction_id or str(uuid.uuid4())
     current_time = datetime.utcnow()
     
-    # 0. Sauvegarder la Transaction en DB (pour le dashboard)
-    # On essaie de lier à un wallet existant si possible, sinon on laisse null ou on gère
+    # 0. Résolution du Wallet de Destination (si email fourni)
+    destination_wallet_id = transaction_req.destination_wallet_id
+    if not destination_wallet_id and transaction_req.recipient_email:
+        # Chercher l'utilisateur par email (Normalisé)
+        dest_email = transaction_req.recipient_email.lower()
+        dest_user_stmt = select(User).where(User.email == dest_email)
+        dest_user = db.execute(dest_user_stmt).scalars().first()
+        
+        if dest_user:
+            # Chercher son wallet (le premier pour l'instant)
+            dest_wallet_stmt = select(Wallet).where(Wallet.user_id == dest_user.user_id)
+            dest_wallet = db.execute(dest_wallet_stmt).scalars().first()
+            if dest_wallet:
+                destination_wallet_id = dest_wallet.wallet_id
+
+    # 1. Vérification Solde (Pre-check)
+    if transaction_req.direction == "OUTGOING":
+        source_wallet = db.get(Wallet, transaction_req.source_wallet_id)
+        if not source_wallet:
+             raise HTTPException(status_code=404, detail="Wallet source introuvable")
+        if source_wallet.balance < Decimal(str(transaction_req.amount)):
+             raise HTTPException(status_code=400, detail="Solde insuffisant")
+
+    # 2. Sauvegarder la Transaction (PENDING)
     new_tx = Transaction(
         transaction_id=transaction_id,
-        amount=transaction_req.amount,
+        amount=Decimal(str(transaction_req.amount)),
         currency=transaction_req.currency,
         source_wallet_id=transaction_req.source_wallet_id,
-        destination_wallet_id=transaction_req.destination_wallet_id,
+        destination_wallet_id=destination_wallet_id, # Utilisation de l'ID résolu
         transaction_type=transaction_req.transaction_type,
         direction=transaction_req.direction,
         country=transaction_req.country,
         city=transaction_req.city,
         description=transaction_req.description,
-        initiator_user_id=transaction_req.initiator_user_id, # Must be passed or inferred
+        initiator_user_id=transaction_req.initiator_user_id,
         created_at=current_time,
         kyc_status="PENDING"
     )
     db.add(new_tx)
-    db.commit() # Commit transaction first
+    # On commit ici pour avoir l'ID transaction dispo pour les logs, 
+    # mais attention si crash après -> transaction PENDING orpheline (acceptable)
+    db.commit() 
+    db.refresh(new_tx)
     
-    # Convertir en dict pour ML
+    # 3. Enrichissement & Scoring IA
     transaction_dict = transaction_req.dict()
     transaction_dict["transaction_id"] = transaction_id
     transaction_dict["created_at"] = transaction_dict.get("created_at") or current_time.isoformat()
     
-    # 1. Enrichir la transaction (features historiques depuis DB)
-    enriched_transaction = await enrich_transaction_with_historical_features(
-        transaction_dict,
-        db
-    )
-    
-    # 2. Appeler le ML Engine
+    enriched_transaction = await enrich_transaction_with_historical_features(transaction_dict, db)
     scoring_result = await call_ml_engine(enriched_transaction)
     
-    # Update transaction status based on AI decision
     decision = scoring_result.get("decision", "APPROVE")
     new_tx.kyc_status = "VALIDATED" if decision == "APPROVE" else "REJECTED"
     if decision == "REVIEW":
@@ -350,15 +422,43 @@ async def create_transaction(
     
     db.add(new_tx)
     
-    # 3. Sauvegarder dans ai_decisions
+    # 4. Sauvegarde Décision IA
     try:
         await save_ai_decision(transaction_id, scoring_result, db)
     except Exception as e:
-        print(f"Erreur lors de la sauvegarde AI Decision: {e}")
+        print(f"Erreur save_ai_decision: {e}")
+
+    # 5. Exécution Financière (Ledger) si VALIDATED
+    if new_tx.kyc_status == "VALIDATED":
+        try:
+            # Débit Source
+            if new_tx.direction == "OUTGOING":
+                execute_balance_movement(
+                    db, 
+                    wallet_id=new_tx.source_wallet_id, 
+                    amount=transaction_req.amount, 
+                    transaction_id=transaction_id, 
+                    entry_type="DEBIT"
+                )
+            
+            # Crédit Destination (si wallet interne)
+            if new_tx.destination_wallet_id:
+                execute_balance_movement(
+                    db,
+                    wallet_id=new_tx.destination_wallet_id,
+                    amount=transaction_req.amount,
+                    transaction_id=transaction_id,
+                    entry_type="CREDIT"
+                )
+                
+        except ValueError as e:
+            # Rollback transaction status if ledger fails
+            new_tx.kyc_status = "FAILED"
+            db.add(new_tx)
+            raise HTTPException(status_code=400, detail=str(e))
     
     db.commit()
     
-    # 4. Retourner la réponse
     return TransactionResponse(
         transaction_id=transaction_id,
         risk_score=scoring_result.get("risk_score", 0.0),

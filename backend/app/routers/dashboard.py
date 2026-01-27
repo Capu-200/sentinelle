@@ -33,11 +33,18 @@ def get_dashboard_summary(
         )
     
     # 2. Get Recent Transactions
-    # We want transactions where user is initiator OR user owns the wallet
-    # Simplified: fetch where initiator_user_id is current_user.user_id
+    # Fetch where user is initiator OR user owns source/destination wallet
+    user_wallet_ids = []
+    if wallet:
+        user_wallet_ids = [wallet.wallet_id]
+
     tx_stmt = (
         select(Transaction)
-        .where(Transaction.initiator_user_id == current_user.user_id)
+        .where(
+            (Transaction.initiator_user_id == current_user.user_id) |
+            (Transaction.source_wallet_id.in_(user_wallet_ids)) |
+            (Transaction.destination_wallet_id.in_(user_wallet_ids))
+        )
         .order_by(Transaction.created_at.desc())
         .limit(5)
     )
@@ -45,15 +52,20 @@ def get_dashboard_summary(
     
     tx_list = []
     for tx in transactions:
+        # Determine direction relative to current user
+        direction = tx.direction
+        if tx.destination_wallet_id in user_wallet_ids and tx.source_wallet_id not in user_wallet_ids:
+            direction = "INCOMING"
+
         tx_list.append(
             TransactionResponseLite(
                 transaction_id=tx.transaction_id,
                 amount=float(tx.amount),
                 currency=tx.currency,
                 transaction_type=tx.transaction_type,
-                direction=tx.direction,
-                status=tx.kyc_status, # or mapped status
-                recipient_name=tx.description or "Unknown Data", # In real app, join with destination User
+                direction=direction,
+                status=tx.kyc_status,
+                recipient_name=tx.description or "Unknown Data",
                 created_at=tx.created_at
             )
         )

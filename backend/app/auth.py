@@ -12,7 +12,7 @@ from .models import User
 # Configuration (In production, use env vars)
 SECRET_KEY = "sentinelle_secret_key_change_me_in_production"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 7 days
 
 ph = PasswordHasher()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
