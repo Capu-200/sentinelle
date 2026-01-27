@@ -4,3 +4,9 @@ sqlmodel
 psycopg2-binary
 alembic
 kafka-python==2.0.2
+httpx
+pydantic
+python-jose[cryptography]
+argon2-cffi
+email-validator
+bcrypt

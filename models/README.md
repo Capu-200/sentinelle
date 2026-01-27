@@ -1,67 +1,192 @@
-# ML Payon — Fraud Scoring Engine (Cloud Run-ready)
+# 🛡️ Sentinelle ML Engine - Documentation
 
-Ce dépôt contient la **documentation de référence** et (à terme) le code du moteur de scoring de fraude bancaire Payon.
+Moteur de scoring ML pour la détection de fraude bancaire, déployé sur Google Cloud Run.
 
-## Objectif
+## 📋 Vue d'Ensemble
 
-Analyser **chaque transaction intra-wallet** en temps quasi réel et produire :
+Le ML Engine analyse chaque transaction en temps réel et produit :
+- Un **score de risque** (0 → 1)
+- Une **décision** : `APPROVE`, `REVIEW`, `BLOCK`
+- Une **explication** : liste de règles/signaux déclenchés
 
-- un **score de risque** \(0 → 1\)
-- une **décision** : `APPROVE`, `REVIEW`, `BLOCK`
-- une **explication minimale** : liste de règles / signaux déclenchés
+### Architecture
 
-Le moteur est conçu pour être :
-
-- **indépendant du back** et **indépendant de la DB métier**
-- **consommable via API** (déploiement cible : **Google Cloud Run**)
-- **compatible event-driven** (ex : Kafka) — *sans gérer Kafka dans ce repo*
-
-## Sortie attendue (contrat)
-
-Exemple :
-
-```json
-{
-  "risk_score": 0.83,
-  "decision": "BLOCK",
-  "reasons": ["amount_over_kyc_limit", "sanctioned_country", "high_velocity"],
-  "model_version": "v1.0.0"
-}
+```
+Backend API (Cloud Run)
+  ↓
+ML Engine (Cloud Run Service) ← Ce projet
+  ├─> Feature Engineering
+  ├─> Règles métier
+  ├─> Scoring ML (supervisé + non supervisé)
+  └─> Décision finale
+  ↓
+Retourne {risk_score, decision, reasons}
 ```
 
-## Architecture
+---
 
-- `docs/00-architecture.md` — **Architecture du projet** (structure, modules, flux)
+## 📚 Documentation
 
-## Documentation (source de vérité)
+### 🎓 [01_ENTRAINEMENT.md](01_ENTRAINEMENT.md)
+**Pour** : Entraîner et déployer les modèles ML
 
-### Guide d'utilisation
+**Deux workflows disponibles** :
+- **☁️ Cloud** : Entraînement sur Cloud Run Jobs (automatisé, scalable)
+- **💻 Local** : Entraînement local → Upload vers Cloud Storage (dataset complet, pas de timeout)
 
-- **`GUIDE-UTILISATION.md`** — **Guide complet d'utilisation** (commandes, tests, règles, troubleshooting)
+**Contenu** :
+- Préparation des données (mapping PaySim, split temporel)
+- Feature engineering pour l'entraînement
+- Ajustement des paramètres des modèles
+- Entraînement (LightGBM supervisé + IsolationForest non supervisé)
+- Calibration des seuils
+- Versioning des modèles
+- Déploiement (Cloud ou Local)
 
-### Documentation technique
+**Quand l'utiliser** : Pour créer ou mettre à jour les modèles ML
 
-- `docs/00-architecture.md` — **Architecture du projet** (structure, modules, flux)
-- `docs/01-requirements-and-decisions.md` — périmètre, contraintes, hypothèses v1
-- `docs/02-api-contract.md` — contrat JSON (entrée / sortie) + exemples
-- `docs/03-rules.md` — règles R1→R4 (v1 proposées, à ajuster)
-- `docs/03-rules-detailed.md` — règles R1→R15 détaillées
-- `docs/04-feature-engineering.md` — features comportementales + fenêtres temporelles
-- `docs/05-models.md` — modèles supervisé / non supervisé (choix & entraînement)
-- `docs/06-scoring-thresholds.md` — score global, décisions, calibration, tuning
-- `docs/07-cloud-run.md` — principes de déploiement Cloud Run & contraintes perf
-- `docs/08-logging-observability.md` — logs (7 jours), audit, traçabilité
-- `docs/09-open-questions.md` — points restant à trancher (liste courte)
-- `docs/10-data-training-evaluation.md` — données, split temporel, KPI, seuils
-- `docs/11-security-privacy.md` — baseline sécurité & données interdites
-- `docs/12-data-preparation.md` — cleaning, anti-leakage, préparation entraînement
+---
 
-## Schémas JSON
+### ⚖️ [02_REGLES.md](02_REGLES.md)
+**Pour** : Comprendre et configurer les règles métier
 
-- `schemas/transaction.schema.json` — schéma d’entrée (transaction)
-- `schemas/decision.schema.json` — schéma de sortie (décision de scoring)
+- Liste complète des règles (R1-R15)
+- Configuration des règles
+- Exemples de règles déclenchées
+- Intégration dans le pipeline
 
-## Données locales (dev)
+**Quand l'utiliser** : Pour modifier les règles métier ou comprendre leur fonctionnement
 
-- `Data/README.md` — datasets présents (`Data/raw/*.csv`) + conventions
+---
 
+### 🎯 [03_SCORING.md](03_SCORING.md)
+**Pour** : Comprendre le pipeline de scoring et utiliser l'API
+
+- Pipeline complet (features → règles → ML → décision)
+- Utilisation de l'API ML Engine
+- Interprétation des résultats
+- Architecture du flux
+
+**Quand l'utiliser** : Pour intégrer le ML Engine ou comprendre le scoring
+
+---
+
+### ☁️ [04_DEPLOIEMENT.md](04_DEPLOIEMENT.md)
+**Pour** : Déployer le ML Engine et les jobs d'entraînement sur Google Cloud
+
+- Déploiement du ML Engine (scoring) sur Cloud Run
+- Déploiement du Training Job sur Cloud Run Jobs
+- Configuration Cloud (variables d'environnement, ressources)
+- Monitoring et logs
+
+**Quand l'utiliser** : Pour déployer en production ou mettre à jour les services
+
+---
+
+## 🚀 Quick Start
+
+### 1. Entraîner un modèle
+
+**Option A : Cloud** (recommandé pour production)
+```bash
+cd models
+./scripts/deploy-training-job.sh \
+  "sentinelle-485209" \
+  "sentinelle-training" \
+  "europe-west1" \
+  "1.0.0"
+```
+
+**Option B : Local** (recommandé pour développement)
+```bash
+cd models
+./scripts/train-local.sh 1.0.0
+./scripts/upload-artifacts.sh 1.0.0
+```
+
+Voir [01_ENTRAINEMENT.md](01_ENTRAINEMENT.md) pour les détails des deux workflows.
+
+---
+
+### 2. Déployer le ML Engine
+
+```bash
+cd models
+./scripts/deploy-ml-engine.sh \
+  "sentinelle-485209" \
+  "sentinelle-ml-engine" \
+  "europe-west1" \
+  "1.0.0"
+```
+
+Voir [04_DEPLOIEMENT.md](04_DEPLOIEMENT.md) pour les détails.
+
+---
+
+### 3. Utiliser l'API
+
+```bash
+curl -X POST https://sentinelle-ml-engine-xxx.run.app/score \
+  -H "Content-Type: application/json" \
+  -d '{
+    "transaction": {...},
+    "context": {...}
+  }'
+```
+
+Voir [03_SCORING.md](03_SCORING.md) pour les détails.
+
+---
+
+## 🏗️ Structure du Projet
+
+```
+models/
+├── api/                    # ML Engine API (FastAPI)
+│   └── main.py            # Endpoint /score
+├── src/                    # Code source ML
+│   ├── data/              # Préparation des données
+│   ├── features/          # Feature engineering
+│   ├── models/            # Modèles ML (supervisé + non supervisé)
+│   ├── rules/             # Règles métier
+│   └── scoring/           # Scoring et décision
+├── scripts/               # Scripts utilitaires
+│   ├── train.py          # Entraînement
+│   └── deploy-*.sh       # Déploiement Cloud
+├── configs/               # Configurations (YAML)
+├── schemas/               # Schémas JSON
+└── docs/                  # Documentation détaillée (legacy)
+```
+
+---
+
+## 🔧 Technologies
+
+- **Python 3.11+**
+- **FastAPI** : API ML Engine
+- **LightGBM** : Modèle supervisé
+- **IsolationForest** : Modèle non supervisé
+- **Google Cloud Run** : Déploiement
+- **Google Cloud Storage** : Stockage des artefacts
+
+---
+
+## 📖 Pour Aller Plus Loin
+
+- **Nouveau sur le projet ?** → Commencez par [01_ENTRAINEMENT.md](01_ENTRAINEMENT.md)
+- **Modifier les règles ?** → Voir [02_REGLES.md](02_REGLES.md)
+- **Intégrer l'API ?** → Voir [03_SCORING.md](03_SCORING.md)
+- **Déployer en production ?** → Voir [04_DEPLOIEMENT.md](04_DEPLOIEMENT.md)
+
+---
+
+## 🤝 Contribution
+
+Ce projet fait partie de Sentinelle, une application de détection de fraude bancaire.
+
+**Questions ?** Consultez la documentation correspondante ou contactez l'équipe.
+
+---
+
+**Version** : 1.0.0  
+**Dernière mise à jour** : Janvier 2026
