@@ -81,13 +81,35 @@ async def health():
     }
 
 
+def _require_enriched_transaction(transaction: dict) -> None:
+    """Exige le format enrichi : transaction.features.transactional et .historical."""
+    if "features" not in transaction:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "TRANSACTION_FORMAT_REQUIRED",
+                "message": "Format enrichi obligatoire. La transaction doit contenir 'features.transactional' et 'features.historical'. Voir EXEMPLES_JSON_HISTORIQUE.md.",
+            },
+        )
+    feats = transaction.get("features") or {}
+    if "transactional" not in feats or "historical" not in feats:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "TRANSACTION_FORMAT_REQUIRED",
+                "message": "transaction.features doit contenir 'transactional' et 'historical' (même vides pour un nouveau compte).",
+            },
+        )
+
+
 @app.post("/score", response_model=ScoreResponse)
 async def score_transaction(request: ScoreRequest):
     """
     Score une transaction.
     
-    Args:
-        request: Transaction enrichie avec features pré-calculées
+    Format accepté : transaction enrichie uniquement.
+    transaction doit contenir features.transactional et features.historical
+    (pour un new user, historical peut être à 0 / -1.0 / 1).
     
     Returns:
         Score de risque, décision, et raisons
@@ -95,8 +117,10 @@ async def score_transaction(request: ScoreRequest):
     transaction = request.transaction
     context = request.context or {}
     
-    # 1. Feature Engineering
-    features = feature_pipeline.transform(transaction, historical_data=None)
+    _require_enriched_transaction(transaction)
+    
+    # 1. Feature Engineering (format enrichi uniquement)
+    features = feature_pipeline.transform(transaction)
     
     # 2. Règles métier
     rules_output = rules_engine.evaluate(transaction, features, context)

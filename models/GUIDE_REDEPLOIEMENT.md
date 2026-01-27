@@ -77,6 +77,24 @@ cd models
 
 **Temps** : ~5-10 minutes
 
+### Si l’erreur « ambiguous truth value » ou 500 persiste après déploiement
+
+1. **Vérifier le code déployé**  
+   Le déploiement utilise le dossier depuis lequel vous lancez le script. Lancez toujours depuis le répertoire `models/` :
+   ```bash
+   cd /chemin/vers/sentinelle/models
+   ./scripts/deploy-ml-engine.sh
+   ```
+2. **Forcer un rebuild complet**  
+   Si Cloud Build réutilise une ancienne image, build puis déploiement à la main sans cache :
+   ```bash
+   cd models
+   # Build sans cache puis déployer l’image
+   gcloud builds submit --tag europe-west1-docker.pkg.dev/sentinelle-485209/cloud-run-source-deploy/sentinelle-ml-engine:latest . --no-cache --project=sentinelle-485209
+   gcloud run deploy sentinelle-ml-engine --image europe-west1-docker.pkg.dev/sentinelle-485209/cloud-run-source-deploy/sentinelle-ml-engine:latest --region=europe-west1
+   ```
+   (À adapter selon votre projet/région si besoin.)
+
 ---
 
 ### Étape 3 : Vérifier le Déploiement

@@ -1,4 +1,4 @@
-# Dockerfile pour l'entraînement (Cloud Run Jobs)
+# Dockerfile pour le ML Engine (Cloud Run Service)
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -22,27 +22,26 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create directories
-RUN mkdir -p /app/data /app/artifacts
+RUN mkdir -p /app/artifacts
 
-# Set working directory for data
-ENV DATA_DIR=/app/data
+# Set environment variables
 ENV ARTIFACTS_DIR=/app/artifacts
+ENV MODEL_VERSION=latest
+ENV BUCKET_NAME=""
 
-# Script d'entraînement qui télécharge les données depuis GCS
+# Script de démarrage qui télécharge les modèles depuis GCS si nécessaire
 RUN echo '#!/bin/bash\n\
 set -e\n\
-echo "📥 Téléchargement des données depuis Cloud Storage..."\n\
-if [ -n "$BUCKET_NAME" ]; then\n\
-  gsutil -m cp "gs://${BUCKET_NAME}/data/*.csv" /app/data/ 2>&1 || echo "⚠️  Erreur lors du téléchargement"\n\
+if [ -n "$BUCKET_NAME" ] && [ -n "$MODEL_VERSION" ]; then\n\
+  echo "📥 Téléchargement des modèles depuis Cloud Storage..."\n\
+  /app/scripts/download-artifacts.sh "$MODEL_VERSION" "$BUCKET_NAME" "$ARTIFACTS_DIR" || echo "⚠️  Erreur lors du téléchargement, utilisation des modèles locaux si présents"\n\
 fi\n\
-echo "🚀 Lancement de l'\''entraînement..."\n\
-python scripts/train.py --data-dir /app/data --artifacts-dir /app/artifacts --version ${VERSION:-1.0.0}\n\
-echo "📤 Upload des artefacts vers Cloud Storage..."\n\
-if [ -n "$BUCKET_NAME" ]; then\n\
-  gsutil -m cp -r /app/artifacts/* "gs://${BUCKET_NAME}/artifacts/" 2>&1 || echo "⚠️  Erreur lors de l'\''upload"\n\
-fi\n\
-echo "✅ Entraînement terminé!"' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+echo "🚀 Démarrage du ML Engine..."\n\
+exec uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8080}' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
-# Default command: run training script
+# Make scripts executable
+RUN chmod +x scripts/*.sh 2>/dev/null || true
+
+# Default command: run API
 CMD ["/app/entrypoint.sh"]
 

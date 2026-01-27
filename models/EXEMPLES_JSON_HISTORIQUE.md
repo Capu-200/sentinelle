@@ -1,26 +1,13 @@
 # 🧪 Exemples JSON avec Historique pour Tests Postman
 
-Guide pour tester le ML Engine avec des transactions enrichies (historique inclus).
+Le ML Engine n’accepte **qu’un seul format** : la **transaction enrichie** avec `features.transactional` et `features.historical`.
 
 ---
 
-## 📋 Format Attendu par le ML Engine
+## 📋 Format accepté (obligatoire)
 
-Le ML Engine accepte deux formats :
+Toute requête POST /score doit avoir la forme :
 
-### Format 1 : Transaction Simple (actuel)
-```json
-{
-  "transaction": {
-    "transaction_id": "...",
-    "amount": 150.0,
-    ...
-  }
-}
-```
-**→ Pas d'historique, features calculées depuis transaction uniquement**
-
-### Format 2 : Transaction Enrichie (avec historique)
 ```json
 {
   "transaction": {
@@ -28,13 +15,19 @@ Le ML Engine accepte deux formats :
     "amount": 150.0,
     ...
     "features": {
-      "transactional": {...},
-      "historical": {...}
+      "transactional": { ... },
+      "historical": { ... }
     }
-  }
+  },
+  "context": { ... }
 }
 ```
-**→ Historique inclus, ML Engine extrait les features pré-calculées**
+
+- **`transaction.features.transactional`** : montant, log_amount, direction, heure, type, pays, etc.
+- **`transaction.features.historical`** : agrégats (counts, montants, is_new_destination, days_since, etc.).
+- Pour un **nouveau compte** (sans historique), mettez les champs historiques à 0 / -1.0 / 1 (voir exemples « new user » ci‑dessous).
+
+Sans `features.transactional` et `features.historical`, le service répond **400 Bad Request**.
 
 ---
 
