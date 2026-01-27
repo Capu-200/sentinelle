@@ -31,8 +31,10 @@ gcloud services enable run.googleapis.com \
     artifactregistry.googleapis.com \
     --project="$PROJECT_ID"
 
-# Se déplacer dans le dossier models
-cd "$(dirname "$0")/.." || exit 1
+# Se déplacer dans le dossier models (contexte de build = ce dossier)
+MODELS_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$MODELS_DIR" || exit 1
+echo "   Contexte de build: $MODELS_DIR"
 
 # Bucket Cloud Storage pour les artefacts
 BUCKET_NAME="${PROJECT_ID}-ml-data"

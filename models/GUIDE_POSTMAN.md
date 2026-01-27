@@ -4,6 +4,18 @@ Guide complet pour tester le ML Engine avec Postman.
 
 ---
 
+## ⚠️ Format obligatoire : transaction enrichie uniquement
+
+**Toute requête POST /score doit envoyer une transaction au format enrichi.**
+
+- `transaction` doit contenir **`features.transactional`** et **`features.historical`**.
+- Pour un **nouveau compte** (sans historique), envoyez quand même `transactional` et `historical` avec des valeurs à 0 / -1.0 / 1 (voir `EXEMPLES_JSON_HISTORIQUE.md`).
+- Une requête sans `features` ou sans `transactional`/`historical` renvoie **400 Bad Request**.
+
+Les exemples complets (normale, suspecte, blocage, new user) sont dans **`EXEMPLES_JSON_HISTORIQUE.md`**.
+
+---
+
 ## 🔗 URL du Service
 
 ```
@@ -27,162 +39,75 @@ Sélectionnez **"Body"** → **"raw"** → **"JSON"**
 
 ---
 
-## 🎯 Exemple 1 : Transaction Normale
+## 🎯 Exemple 1 : New user (format enrichi minimal)
 
-### Requête
+Transaction sans historique : `transactional` + `historical` avec valeurs "nouveau compte" (0, -1.0, 1).
 
 **URL** : `POST https://sentinelle-ml-engine-ntqku76mya-ew.a.run.app/score`
 
-**Body** :
+**Body** : voir **EXEMPLES_JSON_HISTORIQUE.md** § « Nouveau compte (new user) ».
+
+Exemple minimal (copier-coller) :
+
 ```json
 {
   "transaction": {
-    "transaction_id": "test_normal_001",
+    "transaction_id": "test_new_001",
     "amount": 50.0,
     "currency": "PYC",
-    "source_wallet_id": "wallet_normal_001",
+    "source_wallet_id": "wallet_new_001",
     "destination_wallet_id": "wallet_dest_001",
     "transaction_type": "TRANSFER",
     "direction": "outgoing",
     "created_at": "2024-01-15T14:30:00Z",
     "country": "FR",
-    "city": "Paris",
-    "description": "Paiement normal"
+    "features": {
+      "transactional": {
+        "amount": 50.0,
+        "log_amount": 3.93,
+        "currency_is_pyc": true,
+        "direction_outgoing": 1,
+        "hour_of_day": 14,
+        "day_of_week": 1,
+        "transaction_type_TRANSFER": 1
+      },
+      "historical": {
+        "src_tx_count_out_5m": 0,
+        "src_tx_count_out_1h": 0,
+        "src_tx_count_out_24h": 0,
+        "src_tx_count_out_7d": 0,
+        "src_tx_amount_sum_out_1h": 0.0,
+        "src_tx_amount_mean_out_7d": 0.0,
+        "src_tx_amount_max_out_7d": 0.0,
+        "src_unique_destinations_24h": 0,
+        "is_new_destination_30d": 1,
+        "src_to_dst_tx_count_30d": 0,
+        "days_since_last_src_to_dst": -1.0,
+        "src_destination_concentration_7d": 0.0,
+        "src_destination_entropy_7d": 0.0,
+        "is_new_country_30d": 1,
+        "country_mismatch": 0,
+        "src_failed_count_24h": 0,
+        "src_failed_ratio_7d": 0.0
+      }
+    }
   },
   "context": {
-    "source_wallet": {
-      "balance": 1000.0,
-      "status": "active"
-    },
-    "user": {
-      "status": "active",
-      "risk_level": "low"
-    }
+    "source_wallet": { "balance": 1000.0, "status": "active" },
+    "user": { "status": "active", "risk_level": "low" }
   }
 }
 ```
 
-### Réponse Attendue
+### Réponse attendue
 
-```json
-{
-  "risk_score": 0.2345,
-  "decision": "APPROVE",
-  "reasons": [],
-  "model_version": "1.0.0-test"
-}
-```
-
-**Interprétation** :
-- ✅ `decision: "APPROVE"` → Transaction normale, approuvée
-- ✅ `risk_score: 0.2345` → Score faible (< 0.6461)
-- ✅ `reasons: []` → Aucune règle déclenchée
+`decision: "APPROVE"` (ou `REVIEW` selon le modèle), `risk_score` numérique.
 
 ---
 
-## ⚠️ Exemple 2 : Transaction Suspecte (REVIEW)
+## 📂 Exemples complets (normale, suspecte, blocage)
 
-### Requête
-
-**URL** : `POST https://sentinelle-ml-engine-ntqku76mya-ew.a.run.app/score`
-
-**Body** :
-```json
-{
-  "transaction": {
-    "transaction_id": "test_suspect_001",
-    "amount": 250.0,
-    "currency": "PYC",
-    "source_wallet_id": "wallet_suspect_001",
-    "destination_wallet_id": "wallet_new_001",
-    "transaction_type": "TRANSFER",
-    "direction": "outgoing",
-    "created_at": "2024-01-15T14:30:00Z",
-    "country": "FR",
-    "city": "Paris",
-    "description": "Transaction suspecte"
-  },
-  "context": {
-    "source_wallet": {
-      "balance": 500.0,
-      "status": "active"
-    },
-    "user": {
-      "status": "active",
-      "risk_level": "medium"
-    }
-  }
-}
-```
-
-### Réponse Attendue
-
-```json
-{
-  "risk_score": 0.6823,
-  "decision": "REVIEW",
-  "reasons": ["RULE_AMOUNT_ANOMALY"],
-  "model_version": "1.0.0-test"
-}
-```
-
-**Interprétation** :
-- ⚠️ `decision: "REVIEW"` → Transaction suspecte, nécessite revue humaine
-- ⚠️ `risk_score: 0.6823` → Score entre 0.6461 et 0.7410
-- ⚠️ `reasons: ["RULE_AMOUNT_ANOMALY"]` → Règle déclenchée
-
----
-
-## 🚫 Exemple 3 : Transaction Bloquée (BLOCK)
-
-### Requête
-
-**URL** : `POST https://sentinelle-ml-engine-ntqku76mya-ew.a.run.app/score`
-
-**Body** :
-```json
-{
-  "transaction": {
-    "transaction_id": "test_blocked_001",
-    "amount": 350.0,
-    "currency": "PYC",
-    "source_wallet_id": "wallet_blocked_001",
-    "destination_wallet_id": "wallet_dest_001",
-    "transaction_type": "TRANSFER",
-    "direction": "outgoing",
-    "created_at": "2024-01-15T14:30:00Z",
-    "country": "FR",
-    "city": "Paris",
-    "description": "Transaction bloquée"
-  },
-  "context": {
-    "source_wallet": {
-      "balance": 100.0,
-      "status": "active"
-    },
-    "user": {
-      "status": "active",
-      "risk_level": "low"
-    }
-  }
-}
-```
-
-### Réponse Attendue
-
-```json
-{
-  "risk_score": 1.0,
-  "decision": "BLOCK",
-  "reasons": ["RULE_MAX_AMOUNT"],
-  "model_version": "1.0.0-test"
-}
-```
-
-**Interprétation** :
-- 🚫 `decision: "BLOCK"` → Transaction bloquée automatiquement
-- 🚫 `risk_score: 1.0` → Score maximum (règle hard block)
-- 🚫 `reasons: ["RULE_MAX_AMOUNT"]` → Montant > 300 (règle R1)
+Tous les scénarios au format enrichi (normale avec historique, suspecte, BLOCK, new user) sont dans **EXEMPLES_JSON_HISTORIQUE.md**. Utilisez ces JSON tels quels dans Postman.
 
 ---
 
@@ -211,73 +136,14 @@ Sélectionnez **"Body"** → **"raw"** → **"JSON"**
 
 ---
 
-## 📝 Structure Complète de la Transaction
+## 📝 Structure de la requête (format enrichi uniquement)
 
-### Champs Requis
+La requête doit contenir :
 
-```json
-{
-  "transaction": {
-    "transaction_id": "string",      // Requis
-    "amount": 0.0,                    // Requis (float)
-    "currency": "string",             // Requis (ex: "PYC")
-    "source_wallet_id": "string",     // Requis
-    "destination_wallet_id": "string", // Optionnel
-    "transaction_type": "string",      // Requis (ex: "TRANSFER")
-    "direction": "string",            // Requis ("outgoing" ou "incoming")
-    "created_at": "string",           // Optionnel (ISO format)
-    "country": "string",              // Optionnel (ex: "FR")
-    "city": "string",                 // Optionnel
-    "description": "string"           // Optionnel
-  },
-  "context": {                        // Optionnel
-    "source_wallet": {
-      "balance": 0.0,
-      "status": "string"
-    },
-    "user": {
-      "status": "string",
-      "risk_level": "string"
-    }
-  }
-}
-```
+- **`transaction`** : champs métier + **`features.transactional`** et **`features.historical`** (obligatoires).
+- **`context`** : optionnel (`source_wallet`, `user`, etc.).
 
----
-
-## 🎯 Exemple Complet (Copier-Coller)
-
-### Transaction Normale (APPROVE)
-
-```json
-{
-  "transaction": {
-    "transaction_id": "postman_test_001",
-    "amount": 75.50,
-    "currency": "PYC",
-    "source_wallet_id": "wallet_user_123",
-    "destination_wallet_id": "wallet_merchant_456",
-    "transaction_type": "TRANSFER",
-    "direction": "outgoing",
-    "created_at": "2024-01-15T14:30:00Z",
-    "country": "FR",
-    "city": "Paris",
-    "description": "Achat en ligne"
-  },
-  "context": {
-    "source_wallet": {
-      "balance": 500.0,
-      "status": "active"
-    },
-    "user": {
-      "status": "active",
-      "risk_level": "low"
-    }
-  }
-}
-```
-
-**Copiez-collez ce JSON dans Postman pour tester !**
+Les noms exacts des champs dans `transactional` et `historical` sont définis dans **EXEMPLES_JSON_HISTORIQUE.md** et **JSON_COMPLET_50_FEATURES.md**.
 
 ---
 
@@ -308,19 +174,21 @@ Avant d'envoyer la requête :
 
 ---
 
-### Erreur 422 Unprocessable Entity
+### Erreur 400 Bad Request (TRANSACTION_FORMAT_REQUIRED)
 
-**Cause** : Format JSON invalide ou champs manquants
+**Cause** : La transaction n’a pas le format enrichi attendu.
 
 **Solution** :
-- Vérifiez que le JSON est valide
-- Vérifiez que tous les champs requis sont présents :
-  - `transaction_id`
-  - `amount`
-  - `currency`
-  - `source_wallet_id`
-  - `transaction_type`
-  - `direction`
+- La transaction doit contenir **`features.transactional`** et **`features.historical`**.
+- Utilisez les exemples de **EXEMPLES_JSON_HISTORIQUE.md** (new user, normale, suspecte, blocage).
+
+### Erreur 422 Unprocessable Entity
+
+**Cause** : Format JSON invalide ou champs manquants.
+
+**Solution** :
+- Vérifiez que le JSON est valide.
+- Vérifiez la structure : `transaction`, `transaction.features.transactional`, `transaction.features.historical`.
 
 ---
 

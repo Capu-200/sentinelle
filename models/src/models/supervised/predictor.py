@@ -109,6 +109,23 @@ class SupervisedPredictor:
         # Prédire
         predictions = self.model.predict(df)
         return float(predictions.iloc[0] if isinstance(predictions, pd.Series) else predictions[0])
+
+    @staticmethod
+    def _is_blank_value(val: Any) -> bool:
+        """
+        True si la valeur est considérée comme vide / pas d'historique.
+        Utilise des tests explicites pour éviter "ambiguous truth value" avec ndarray/list.
+        """
+        if val is None:
+            return True
+        if isinstance(val, np.ndarray):
+            return val.size == 0 or not (np.any(np.isfinite(val)) and np.any(val != 0))
+        if isinstance(val, (list, tuple)):
+            return len(val) == 0
+        try:
+            return val in (0, 0.0, -1.0, False)
+        except (ValueError, TypeError):
+            return True
     
     def _ensure_all_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -147,24 +164,9 @@ class SupervisedPredictor:
         
         has_historical = False
         if len(df_complete) > 0 and historical_cols:
-            # Vérifier si au moins une feature historique a une valeur non-nulle/non-zéro
             for col in historical_cols:
                 val = df_complete[col].iloc[0]
-                
-                # Gérer les arrays numpy (éviter l'erreur "ambiguous truth value")
-                if isinstance(val, np.ndarray):
-                    # Si c'est un array, vérifier s'il est non-vide et contient des valeurs significatives
-                    if val.size > 0 and np.any(val != 0) and np.any(~np.isnan(val)):
-                        has_historical = True
-                        break
-                    continue
-                
-                # Pour les valeurs scalaires, vérifier normalement
-                # Considérer comme historique présent si valeur significative
-                if val not in [None, 0, 0.0, -1.0, False, []]:
-                    # Exception : -1.0 pour days_since est normal même avec historique
-                    if col == 'days_since_last_src_to_dst' and val == -1.0:
-                        continue
+                if not self._is_blank_value(val):
                     has_historical = True
                     break
         

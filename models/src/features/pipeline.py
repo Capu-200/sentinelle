@@ -1,8 +1,8 @@
 """
-Pipeline complet de feature engineering.
+Pipeline de feature engineering pour le scoring.
 
-Ce module orchestre l'extraction des features depuis une transaction enrichie
-(format backend) ou depuis une transaction simple (format legacy).
+Une seule logique : format enrichi uniquement.
+transaction doit contenir features.transactional et features.historical.
 """
 
 from __future__ import annotations
@@ -11,32 +11,44 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .aggregator import extract_historical_features, compute_historical_aggregates
-from .extractor import extract_transactional_features, extract_transaction_features
+import numpy as np
+
+from .aggregator import extract_historical_features
+from .extractor import extract_transactional_features
+
+
+def _is_blank_value(val: Any) -> bool:
+    """True si valeur vide / sans signal (évite 'ambiguous truth value' avec ndarray/list)."""
+    if val is None:
+        return True
+    if isinstance(val, np.ndarray):
+        return val.size == 0 or not (np.any(np.isfinite(val)) and np.any(val != 0))
+    if isinstance(val, (list, tuple)):
+        return len(val) == 0
+    try:
+        return val in (0, 0.0, -1.0, False)
+    except (ValueError, TypeError):
+        return True
 
 
 class FeaturePipeline:
     """
-    Pipeline de feature engineering pour les transactions.
+    Pipeline de feature engineering pour le scoring.
 
-    Supporte deux formats :
-    1. Transaction enrichie (nouveau format) : extrait les features pré-calculées
-    2. Transaction simple (legacy) : calcule les features (fallback)
+    Format accepté : transaction enrichie uniquement.
+    transaction doit contenir features.transactional et features.historical.
     """
 
     def __init__(
         self,
         feature_schema_path: Optional[Path] = None,
-        windows: Optional[List[str]] = None,
     ):
         """
         Initialise le pipeline de features.
 
         Args:
             feature_schema_path: Chemin vers le schéma de features versionné
-            windows: Liste des fenêtres temporelles à utiliser (legacy uniquement)
         """
-        self.windows = windows or ["5m", "1h", "24h", "7d", "30d"]
         self.feature_schema = None
 
         if feature_schema_path:
@@ -47,47 +59,37 @@ class FeaturePipeline:
         with open(schema_path, "r") as f:
             self.feature_schema = json.load(f)
 
-    def transform(
-        self,
-        transaction: Dict[str, Any],
-        historical_data: Optional[List[Dict[str, Any]]] = None,
-    ) -> Dict[str, Any]:
+    def transform(self, transaction: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Transforme une transaction en features.
-
-        Détecte automatiquement le format :
-        - Transaction enrichie : si `transaction.get("features")` existe
-        - Transaction simple : sinon (legacy)
+        Transforme une transaction enrichie en features.
 
         Args:
-            transaction: Transaction à transformer (enrichie ou simple)
-            historical_data: Historique des transactions (legacy uniquement)
+            transaction: Transaction enrichie avec transaction.features.transactional
+                         et transaction.features.historical (obligatoire).
 
         Returns:
-            Dictionnaire de features complètes
-        """
-        # Détecter le format : transaction enrichie ou simple ?
-        is_enriched = "features" in transaction
+            Dictionnaire de features prêt pour le modèle.
 
-        if is_enriched:
-            # Format enrichi : extraire les features pré-calculées
-            tx_features = extract_transactional_features(transaction)
-            historical_features = extract_historical_features(transaction)
-            
-            # Détecter si l'historique est réellement présent (au moins une feature non-nulle)
-            has_historical = any(
-                v not in [None, 0, 0.0, -1.0, False, []]
-                for v in historical_features.values()
+        Raises:
+            ValueError: Si transaction ne contient pas features.transactional/historical.
+        """
+        if "features" not in transaction:
+            raise ValueError(
+                "Format enrichi obligatoire: transaction doit contenir 'features' "
+                "avec 'transactional' et 'historical'."
             )
-        else:
-            # Format legacy : calculer les features
-            tx_features = extract_transaction_features(transaction)
-            historical_features = compute_historical_aggregates(
-                transaction, historical_data, self.windows
+        feats = transaction.get("features") or {}
+        if "transactional" not in feats or "historical" not in feats:
+            raise ValueError(
+                "transaction.features doit contenir 'transactional' et 'historical'."
             )
-            
-            # Si historical_data est fourni et non vide, historique présent
-            has_historical = historical_data is not None and len(historical_data) > 0
+
+        tx_features = extract_transactional_features(transaction)
+        historical_features = extract_historical_features(transaction)
+
+        has_historical = any(
+            not _is_blank_value(v) for v in historical_features.values()
+        )
 
         # Combiner toutes les features
         all_features = {**tx_features, **historical_features}
