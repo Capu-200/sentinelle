@@ -15,9 +15,7 @@ import httpx
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.kafka_producer import publish_transaction_request
-from datetime import datetime
-import uuid
+
 
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -340,6 +338,8 @@ async def create_transaction(tx: TransactionCreate):
         "message": "Transaction envoyée pour analyse IA",
     }
     
+
+
 @app.get("/transactions", response_model=list[TransactionResponseLite])
 async def get_transactions(
     current_user: User = Depends(get_current_user),

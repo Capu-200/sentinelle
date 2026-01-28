@@ -64,7 +64,7 @@ gcloud run deploy "$SERVICE_NAME" \
     --region="$REGION" \
     --platform=managed \
     --allow-unauthenticated \
-    --set-env-vars="MODEL_VERSION=$MODEL_VERSION,ARTIFACTS_DIR=/app/artifacts,BUCKET_NAME=$BUCKET_NAME" \
+    --set-env-vars="MODEL_VERSION=$MODEL_VERSION,ARTIFACTS_DIR=/app/artifacts,BUCKET_NAME=$BUCKET_NAME,MONITORING_GCS_BUCKET=$BUCKET_NAME,MONITORING_SAMPLE_RATE=0.1" \
     --memory=2Gi \
     --cpu=2 \
     --timeout=300 \
