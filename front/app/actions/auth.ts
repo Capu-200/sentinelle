@@ -51,10 +51,9 @@ export async function registerAction(prevState: any, formData: FormData) {
         const { access_token } = await res.json();
         const cookieStore = await cookies();
         cookieStore.set("auth-token", access_token, {
-            httpOnly: true,
-            secure: true, // Always true on Vercel
-            sameSite: 'lax',
-            maxAge: 60 * 60 * 24 * 7, // 7 days
+            secure: true,
+            sameSite: 'none', // Allow cross-context (if any iframe/redirect weirdness)
+            maxAge: 60 * 60 * 24 * 7,
             path: "/",
         });
     } catch (err) {
@@ -90,10 +89,9 @@ export async function loginAction(prevState: any, formData: FormData) {
         const { access_token } = await res.json();
         const cookieStore = await cookies();
         cookieStore.set("auth-token", access_token, {
-            httpOnly: true,
             secure: true,
-            sameSite: 'lax',
-            maxAge: 60 * 60 * 24 * 7, // 7 days
+            sameSite: 'none',
+            maxAge: 60 * 60 * 24 * 7,
             path: "/",
         });
     } catch (err) {
