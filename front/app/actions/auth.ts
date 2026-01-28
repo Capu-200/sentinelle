@@ -51,8 +51,9 @@ export async function registerAction(prevState: any, formData: FormData) {
         const { access_token } = await res.json();
         const cookieStore = await cookies();
         cookieStore.set("auth-token", access_token, {
+            httpOnly: true,
             secure: true,
-            sameSite: 'none', // Allow cross-context (if any iframe/redirect weirdness)
+            sameSite: 'lax',
             maxAge: 60 * 60 * 24 * 7,
             path: "/",
         });
@@ -89,8 +90,9 @@ export async function loginAction(prevState: any, formData: FormData) {
         const { access_token } = await res.json();
         const cookieStore = await cookies();
         cookieStore.set("auth-token", access_token, {
+            httpOnly: true,
             secure: true,
-            sameSite: 'none',
+            sameSite: 'lax',
             maxAge: 60 * 60 * 24 * 7,
             path: "/",
         });
