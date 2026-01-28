@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { GlassCard } from "@/components/ui/glass-card";
 
-const API_URL = process.env.API_URL || "http://127.0.0.1:8000";
+const API_URL = process.env.API_URL || "https://sentinelle-api-backend-873685706613.europe-west1.run.app";
 
 async function getUserProfile() {
   const cookieStore = await cookies();

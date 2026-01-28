@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { ActivityList } from "@/components/activity/activity-list";
 import { Transaction, TransactionStatus } from "@/types/transaction";
 
-const API_URL = process.env.API_URL || "http://127.0.0.1:8000";
+const API_URL = process.env.API_URL || "https://sentinelle-api-backend-873685706613.europe-west1.run.app";
 
 async function getTransactions(): Promise<Transaction[]> {
     const cookieStore = await cookies();
