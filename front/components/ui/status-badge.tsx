@@ -13,6 +13,7 @@ export const StatusBadge = ({ status, className }: Props) => {
             label: "En attente",
             icon: Clock,
             style: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
+            iconClass:"",
         },
         [TransactionStatus.ANALYZING]: {
             label: "Analyse IA...",
@@ -24,16 +25,19 @@ export const StatusBadge = ({ status, className }: Props) => {
             label: "Vérification requise",
             icon: AlertTriangle,
             style: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 animate-pulse",
+            iconClass:"",
         },
         [TransactionStatus.VALIDATED]: {
             label: "Validé",
             icon: CheckCircle,
             style: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+            iconClass:"",
         },
         [TransactionStatus.REJECTED]: {
             label: "Rejeté",
             icon: XCircle,
             style: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-500",
+            iconClass:"",
         },
     };
 
