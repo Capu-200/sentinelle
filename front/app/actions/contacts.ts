@@ -20,7 +20,7 @@ export async function addContactAction(formData: FormData) {
         if (email) payload.email = email;
         if (iban) payload.iban = iban;
 
-        const res = await fetch("http://127.0.0.1:8000/contacts/", {
+        const res = await fetch("https://sentinelle-api-backend-873685706613.europe-west1.run.app/contacts/", {
             method: "POST",
             headers: {
                 "Authorization": `Bearer ${token.value}`,
