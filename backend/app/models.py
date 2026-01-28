@@ -15,13 +15,13 @@ class UserBase(SQLModel):
     trust_score: Optional[int] = Field(default=100)
 
 class WalletBase(SQLModel):
-    currency: str = Field(default="EUR")
+    currency: str = Field(default="PYC")
     balance: Decimal = Field(default=0.0, max_digits=15, decimal_places=2)
     kyc_status: str = Field(default="PENDING")
 
 class TransactionBase(SQLModel):
     amount: Decimal = Field(default=0.0, max_digits=15, decimal_places=2)
-    currency: str = Field(default="EUR")
+    currency: str = Field(default="PYC")
     status: str = Field(default="PENDING") # Maps to kyc_status or internal status
     created_at: datetime = Field(default_factory=datetime.utcnow)
     recipient_name: Optional[str] = None # Helper for display

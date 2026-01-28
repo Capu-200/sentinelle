@@ -40,6 +40,8 @@ interface DashboardData {
   }[];
 }
 
+const API_URL = process.env.API_URL || "http://127.0.0.1:8000";
+
 async function getDashboardData(): Promise<DashboardData | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get("auth-token");
@@ -47,7 +49,7 @@ async function getDashboardData(): Promise<DashboardData | null> {
   if (!token) return null;
 
   try {
-    const res = await fetch("http://127.0.0.1:8000/dashboard/", {
+    const res = await fetch(`${API_URL}/dashboard/`, {
       headers: {
         "Authorization": `Bearer ${token.value}`,
         "Content-Type": "application/json"
@@ -87,6 +89,10 @@ export default async function Home() {
   }));
 
   const formatCurrency = (amount: number, currency: string) => {
+    // If currency is PYC, just append string. Otherwise use intl.
+    if (currency === "PYC" || currency === "EUR") { // Treating legacy EUR as PYC for display consistency if any remains
+      return new Intl.NumberFormat('fr-FR', { style: 'decimal', minimumFractionDigits: 2 }).format(amount) + " PYC";
+    }
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: currency }).format(amount);
   };
 

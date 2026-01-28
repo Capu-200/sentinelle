@@ -36,7 +36,7 @@ export const TransactionItem = ({ transaction }: Props) => {
                     "font-bold text-sm",
                     isIncoming ? "text-green-600 dark:text-green-400" : "text-foreground"
                 )}>
-                    {isIncoming ? "+" : "-"} {transaction.amount.toLocaleString()} €
+                    {isIncoming ? "+" : "-"} {transaction.amount.toLocaleString()} PYC
                 </p>
                 <div className="mt-1">
                     <StatusBadge status={transaction.status} className="px-2 py-0.5 text-[10px]" />

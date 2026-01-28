@@ -30,7 +30,6 @@ export function ContactList({ initialContacts }: Props) {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [newContactName, setNewContactName] = useState("");
     const [newContactEmail, setNewContactEmail] = useState("");
-    const [newContactIban, setNewContactIban] = useState("");
     const [modalStep, setModalStep] = useState(1); // 1: Input, 2: Success
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState("");
@@ -42,8 +41,8 @@ export function ContactList({ initialContacts }: Props) {
     const handleAddContact = async () => {
         setError("");
         if (!newContactName.trim()) return;
-        if (!newContactEmail.trim() && !newContactIban.trim()) {
-            setError("Veuillez saisir un email ou un IBAN");
+        if (!newContactEmail.trim()) {
+            setError("Veuillez saisir un email");
             return;
         }
 
@@ -51,7 +50,6 @@ export function ContactList({ initialContacts }: Props) {
         const formData = new FormData();
         formData.append("name", newContactName);
         if (newContactEmail) formData.append("email", newContactEmail);
-        if (newContactIban) formData.append("iban", newContactIban);
 
         const res = await addContactAction(formData);
 
@@ -66,12 +64,13 @@ export function ContactList({ initialContacts }: Props) {
                 setModalStep(1);
                 setNewContactName("");
                 setNewContactEmail("");
-                setNewContactIban("");
             }, 1500);
         } else {
             setError(res.error || "Erreur lors de l'ajout");
         }
     };
+
+    // ... handleDelete (kept same)
 
     const handleDelete = async (e: React.MouseEvent, id: string) => {
         e.preventDefault(); // Prevent navigation
@@ -79,9 +78,11 @@ export function ContactList({ initialContacts }: Props) {
 
         const res = await deleteContactAction(id);
         if (res.success) {
+            toast.success("Contact supprimé");
             router.refresh();
         } else {
-            alert("Erreur lors de la suppression");
+            toast.error(res.error || "Erreur lors de la suppression");
+            console.error(res.error);
         }
     };
 
@@ -95,7 +96,7 @@ export function ContactList({ initialContacts }: Props) {
                             <>
                                 <div className="space-y-2 text-center">
                                     <h3 className="text-xl font-bold">Nouveau bénéficiaire</h3>
-                                    <p className="text-sm text-muted-foreground">Ajouter un ami ou un compte externe</p>
+                                    <p className="text-sm text-muted-foreground">Ajouter un ami PayOn</p>
                                 </div>
 
                                 <div className="space-y-4">
@@ -111,40 +112,15 @@ export function ContactList({ initialContacts }: Props) {
                                         />
                                     </div>
 
-                                    {/* Choice: Email OR Iban */}
+                                    {/* Email Only */}
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium ml-1">Email <span className="text-xs text-muted-foreground">(Pour virement interne)</span></label>
                                         <input
                                             type="email"
                                             value={newContactEmail}
-                                            onChange={e => {
-                                                setNewContactEmail(e.target.value);
-                                                if (e.target.value) setNewContactIban(""); // Mutual exclusive logic for simplicity
-                                            }}
+                                            onChange={e => setNewContactEmail(e.target.value)}
                                             className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-indigo-500"
                                             placeholder="marie.curie@email.com"
-                                            disabled={!!newContactIban}
-                                        />
-                                    </div>
-
-                                    <div className="relative flex py-1 items-center">
-                                        <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
-                                        <span className="flex-shrink-0 mx-4 text-xs text-slate-400 font-medium">OU</span>
-                                        <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium ml-1">IBAN <span className="text-xs text-muted-foreground">(Externe)</span></label>
-                                        <input
-                                            type="text"
-                                            value={newContactIban}
-                                            onChange={e => {
-                                                setNewContactIban(e.target.value);
-                                                if (e.target.value) setNewContactEmail("");
-                                            }}
-                                            className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-sm uppercase"
-                                            placeholder="FR76 ...."
-                                            disabled={!!newContactEmail}
                                         />
                                     </div>
 
@@ -165,7 +141,7 @@ export function ContactList({ initialContacts }: Props) {
                                     </button>
                                     <button
                                         onClick={handleAddContact}
-                                        disabled={!newContactName.trim() || (!newContactEmail && !newContactIban) || isSubmitting}
+                                        disabled={!newContactName.trim() || !newContactEmail || isSubmitting}
                                         className="py-3 rounded-xl font-bold bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex justify-center items-center"
                                     >
                                         {isSubmitting ? "Ajout..." : "Ajouter"}

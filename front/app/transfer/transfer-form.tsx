@@ -2,11 +2,12 @@
 
 import { createTransferAction } from "@/app/actions";
 import { getContactsAction } from "@/app/actions/contacts"; // Import the new action
-import { Send, RefreshCw } from "lucide-react";
+import { Send, RefreshCw, ShieldCheck } from "lucide-react";
+import { useActionState, useState, useEffect } from "react"; // Added useActionState
 import { useFormStatus } from "react-dom";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import { TransactionLoader } from "@/components/ui/transaction-loader";
 
 interface Contact {
     contact_id: string;
@@ -49,10 +50,21 @@ export function TransferForm({ contacts: initialContacts }: Props) {
     const searchParams = useSearchParams();
     const initialRecipient = searchParams.get("to") || "";
 
+    // Initial state for the form action
+    const initialState = {
+        success: false,
+        message: "",
+    };
+
+    // Use useActionState instead of useFormState
+    // @ts-ignore
+    const [state, formAction] = useActionState(createTransferAction, initialState);
+
     const [contacts, setContacts] = useState<Contact[]>(initialContacts);
     const [amount, setAmount] = useState("");
     const [recipient, setRecipient] = useState(initialRecipient);
     const [isLoading, setIsLoading] = useState(false);
+    const [errorDismissed, setErrorDismissed] = useState(false); // Moved state up
 
     // Fetch contacts on mount if empty (Client-Side Fallback)
     useEffect(() => {
@@ -88,15 +100,50 @@ export function TransferForm({ contacts: initialContacts }: Props) {
         }
     }, [initialRecipient, contacts]);
 
+    // Reset dismissed state when submitting again
+    useEffect(() => {
+        if (state?.message) {
+            setErrorDismissed(false); // New error arrived, show screen
+        }
+    }, [state]);
 
     const handleContactClick = (contact: Contact) => {
         setRecipient(contact.email || contact.iban || "");
     };
 
-    return (
-        <form action={createTransferAction} className="flex flex-1 flex-col h-full">
+    // If we have a fresh server error and haven't dismissed it, show BLOCK SCREEN
+    if (state?.message && !state.success && !errorDismissed) {
+        return (
+            <div className="flex flex-1 flex-col items-center justify-center p-6 text-center animate-in zoom-in-95 duration-300">
+                <div className="mb-6 relative">
+                    <div className="absolute inset-0 bg-red-500/10 blur-2xl rounded-full" />
+                    <div className="relative h-20 w-20 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center border-2 border-red-100 dark:border-red-900">
+                        <ShieldCheck className="h-10 w-10 text-red-500" />
+                    </div>
+                </div>
 
-            {/* Recipient Selection (Top) */}
+                <h2 className="text-xl font-bold text-red-600 dark:text-red-500 mb-2">
+                    Transaction Refusée
+                </h2>
+
+                <p className="text-muted-foreground max-w-xs mb-8">
+                    {state.message}
+                </p>
+
+                <button
+                    onClick={() => setErrorDismissed(true)}
+                    className="w-full max-w-xs py-3 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 text-foreground font-medium hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                >
+                    Modifier la transaction
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <form action={formAction} className="relative flex flex-1 flex-col h-full">
+            <TransactionLoader />
+            {/* ... Form Content ... */}
             <div className="space-y-4 pt-4">
                 <label className="text-sm font-medium text-muted-foreground ml-1">Pour qui ?</label>
 
@@ -139,7 +186,7 @@ export function TransferForm({ contacts: initialContacts }: Props) {
                         required
                         name="recipient"
                         type="text"
-                        placeholder="Email, ID utilisateur ou IBAN..."
+                        placeholder="Email ou ID utilisateur..."
                         value={recipient}
                         onChange={(e) => setRecipient(e.target.value)}
                         className="w-full rounded-xl border-0 bg-slate-100 px-4 py-4 text-base outline-none ring-1 ring-transparent focus:bg-white focus:ring-primary/20 transition-all dark:bg-slate-800 dark:focus:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400"
@@ -180,12 +227,21 @@ export function TransferForm({ contacts: initialContacts }: Props) {
                         className="w-full text-center bg-transparent text-6xl md:text-8xl font-black tracking-tighter outline-none placeholder:text-slate-100 dark:placeholder:text-slate-800 text-slate-900 dark:text-white transition-all scale-100 focus:scale-105"
                         style={{ maxWidth: '400px' }}
                     />
-                    <span className="text-5xl font-medium text-slate-400 absolute right-[10%] top-6 pointer-events-none">€</span>
+                    <span className="text-5xl font-medium text-slate-400 absolute right-[10%] top-6 pointer-events-none">PYC</span>
                 </div>
             </div>
 
             {/* Bottom Actions */}
-            <div className="mt-auto pb-4">
+            <div className="mt-auto pb-4 space-y-4">
+
+                {/* Error Message Display */}
+                {state?.message && !state.success && (
+                    <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-xl flex items-center gap-2 text-sm font-medium animate-in fade-in slide-in-from-bottom-2 border border-red-100 dark:border-red-900">
+                        <div className="h-5 w-5 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center shrink-0 font-bold">!</div>
+                        {state.message}
+                    </div>
+                )}
+
                 <div className="rounded-xl bg-slate-50 p-4 text-center text-xs text-muted-foreground dark:bg-slate-900">
                     Frais de transaction : <span className="font-bold text-foreground">Gratuit</span>
                 </div>

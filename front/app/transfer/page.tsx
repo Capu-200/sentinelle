@@ -3,6 +3,8 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { TransferForm } from "./transfer-form";
 
+const API_URL = process.env.API_URL || "http://127.0.0.1:8000";
+
 async function getContacts() {
     const cookieStore = await cookies();
     const token = cookieStore.get("auth-token");
@@ -13,7 +15,7 @@ async function getContacts() {
 
     try {
         console.log("TransferPage: Fetching contacts...");
-        const res = await fetch("http://127.0.0.1:8000/contacts/", {
+        const res = await fetch(`${API_URL}/contacts/`, {
             headers: { "Authorization": `Bearer ${token.value}` },
             cache: "no-store"
         });

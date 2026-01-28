@@ -4,6 +4,8 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { ContactList } from "./contact-list";
 
+const API_URL = process.env.API_URL || "http://127.0.0.1:8000";
+
 // Server Component for fetching initial data
 async function getContacts() {
     const cookieStore = await cookies();
@@ -11,7 +13,7 @@ async function getContacts() {
     if (!token) return [];
 
     try {
-        const res = await fetch("http://127.0.0.1:8000/contacts/", {
+        const res = await fetch(`${API_URL}/contacts/`, {
             headers: { "Authorization": `Bearer ${token.value}` },
             cache: "no-store"
         });
