@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useEffect } from 'react';
 import { useFormStatus } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { GlassCard } from '@/components/ui/glass-card';
 import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2 } from 'lucide-react';
 import Link from 'next/link';
@@ -10,6 +11,7 @@ import toast from 'react-hot-toast';
 
 const initialState = {
     error: '',
+    success: false,
 };
 
 function SubmitButton() {
@@ -34,6 +36,7 @@ function SubmitButton() {
 }
 
 export default function LoginPage() {
+    const router = useRouter();
     const [state, dispatch] = useActionState(loginAction, initialState);
     const [showPassword, setShowPassword] = useState(false);
 
@@ -41,7 +44,11 @@ export default function LoginPage() {
         if (state?.error) {
             toast.error(state.error);
         }
-    }, [state]);
+        if (state?.success) {
+            toast.success('Connexion réussie !');
+            setTimeout(() => router.push('/'), 100);
+        }
+    }, [state, router]);
 
     return (
         <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">

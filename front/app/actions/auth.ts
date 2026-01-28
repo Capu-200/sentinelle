@@ -66,10 +66,10 @@ export async function registerAction(prevState: any, formData: FormData) {
             throw err;
         }
         console.error("Register Error:", err);
-        return { error: "Erreur de connexion au serveur" };
+        return { error: "Erreur de connexion au serveur", success: false };
     }
 
-    redirect("/");
+    return { success: true, error: '' };
 }
 
 export async function loginAction(prevState: any, formData: FormData) {
@@ -119,10 +119,10 @@ export async function loginAction(prevState: any, formData: FormData) {
             throw err;
         }
         console.error("Login Error:", err);
-        return { error: "Erreur de connexion au serveur" };
+        return { error: "Erreur de connexion au serveur", success: false };
     }
 
-    redirect("/");
+    return { success: true, error: '' };
 }
 
 export async function logoutAction() {

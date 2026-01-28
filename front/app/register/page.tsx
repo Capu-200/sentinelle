@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useEffect } from 'react';
 import { useFormStatus } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { GlassCard } from '@/components/ui/glass-card';
 import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2, User, Globe } from 'lucide-react';
 import Link from 'next/link';
@@ -11,6 +12,7 @@ import { cn } from '@/lib/utils';
 
 const initialState = {
     error: '',
+    success: false,
 };
 
 function SubmitButton() {
@@ -35,6 +37,7 @@ function SubmitButton() {
 }
 
 export default function RegisterPage() {
+    const router = useRouter();
     const [state, dispatch] = useActionState(registerAction, initialState);
     const [showPassword, setShowPassword] = useState(false);
 
@@ -46,7 +49,12 @@ export default function RegisterPage() {
         if (state?.error) {
             toast.error(state.error);
         }
-    }, [state]);
+        if (state?.success) {
+            toast.success('Compte créé avec succès !');
+            // Redirection côté client pour garantir que le cookie est bien envoyé
+            setTimeout(() => router.push('/'), 100);
+        }
+    }, [state, router]);
 
     return (
         <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
