@@ -3,7 +3,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { TransferForm } from "./transfer-form";
 
-const API_URL = process.env.API_URL || "https://sentinelle-api-backend-873685706613.europe-west1.run.app";
+const API_URL = process.env.API_URL || "https://sentinelle-api-backend-8773685706613.europe-west1.run.app";
 
 async function getContacts() {
     const cookieStore = await cookies();

@@ -56,7 +56,14 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003", "http://localhost:3004", "http://127.0.0.1:3000"],  # Restricted to Frontend URLs
+    allow_origins=[
+        "http://localhost:3000", 
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "https://sentinelle.vercel.app",
+        "https://sentinelle-git-main-capu-200s-projects.vercel.app",
+        "https://sentinelle-4fl700lr2-capu-200s-projects.vercel.app" # Your specific deployment
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

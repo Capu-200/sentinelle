@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 
-const API_URL = process.env.API_URL || "https://sentinelle-api-backend-873685706613.europe-west1.run.app";
+const API_URL = process.env.API_URL || "https://sentinelle-api-backend-8773685706613.europe-west1.run.app";
 
 const ERROR_MESSAGES: Record<string, string> = {
     "RULE_MAX_AMOUNT": "Montant supérieur à la limite autorisée (300 PYC).",
