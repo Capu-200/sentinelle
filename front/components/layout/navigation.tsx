@@ -3,18 +3,22 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Home, Send, List, ShieldCheck } from "lucide-react";
+import { Home, Send, List, ShieldCheck, User } from "lucide-react";
 
 export const Header = () => {
     return (
         <header className="sticky top-0 z-50 w-full border-b-0 bg-transparent backdrop-blur-sm px-4 py-4 lg:hidden">
-            <div className="container flex items-center max-w-md mx-auto md:max-w-2xl">
+            <div className="container flex items-center mx-auto max-w-7xl">
                 <div className="flex items-center gap-2 font-bold text-lg">
                     <ShieldCheck className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
                     <span>PayOn</span>
                 </div>
                 <div className="ml-auto">
-                    <div className="h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-800" />
+                    <Link href="/profile">
+                        <div className="h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center hover:ring-2 ring-indigo-500 transition-all">
+                            <User className="h-5 w-5 text-slate-500" />
+                        </div>
+                    </Link>
                 </div>
             </div>
         </header>
@@ -28,6 +32,7 @@ export const BottomNav = () => {
         { href: "/", label: "Accueil", icon: Home },
         { href: "/transfer", label: "Envoyer", icon: Send },
         { href: "/activity", label: "Activité", icon: List },
+        { href: "/profile", label: "Profil", icon: User },
     ];
 
     return (

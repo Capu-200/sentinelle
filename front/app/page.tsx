@@ -32,6 +32,12 @@ interface DashboardData {
     recipient_name: string;
     created_at: string;
   }[];
+  contacts?: {
+    name: string;
+    email?: string;
+    iban?: string;
+    is_internal: boolean;
+  }[];
 }
 
 async function getDashboardData(): Promise<DashboardData | null> {
@@ -69,7 +75,7 @@ export default async function Home() {
     redirect("/login");
   }
 
-  const { user, wallet, recent_transactions } = dashboardData;
+  const { user, wallet, recent_transactions, contacts } = dashboardData;
 
   const recentTransactions: Transaction[] = recent_transactions.map(t => ({
     id: t.transaction_id,
@@ -83,13 +89,6 @@ export default async function Home() {
   const formatCurrency = (amount: number, currency: string) => {
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: currency }).format(amount);
   };
-
-  const quickUsers = [
-    { name: "Alice", avatar: "A", color: "bg-pink-100 text-pink-600 dark:bg-pink-900/40 dark:text-pink-400" },
-    { name: "Bob", avatar: "B", color: "bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400" },
-    { name: "Charlie", avatar: "C", color: "bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400" },
-    { name: "David", avatar: "D", color: "bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400" },
-  ];
 
   // Helper for Risk Level Badge
   const getRiskBadgeColor = (level: string) => {
@@ -213,7 +212,7 @@ export default async function Home() {
           </GlassCard>
 
           {/* Actions Row */}
-          <div className="grid grid-cols-2 md:grid-cols-1 gap-6">
+          <div className="grid grid-cols-1 gap-6">
             {/* Quick Actions */}
             <div className="space-y-4">
               <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider px-1">Accès Rapide</h2>
@@ -238,14 +237,18 @@ export default async function Home() {
                   <span className="text-xs font-medium text-slate-500 group-hover:text-indigo-600 transition-colors">Ajouter</span>
                 </Link>
 
-                {quickUsers.map((u, i) => (
-                  <Link key={i} href="/transfer" className="flex flex-col items-center gap-2 min-w-[64px] group">
-                    <div className={cn("h-16 w-16 rounded-2xl flex items-center justify-center font-bold text-xl shadow-sm group-hover:scale-105 group-hover:shadow-md transition-all", u.color)}>
-                      {u.avatar}
-                    </div>
-                    <span className="text-xs font-medium text-slate-600 dark:text-slate-300 group-hover:text-indigo-600 transition-colors">{u.name}</span>
-                  </Link>
-                ))}
+                {contacts && contacts.length > 0 ? (
+                  contacts.slice(0, 5).map((c, i) => (
+                    <Link key={i} href={`/transfer?to=${c.email || c.iban}`} className="flex flex-col items-center gap-2 min-w-[64px] group">
+                      <div className={cn("h-16 w-16 rounded-2xl flex items-center justify-center font-bold text-xl shadow-sm group-hover:scale-105 group-hover:shadow-md transition-all",
+                        c.is_internal ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                      )}>
+                        {c.name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()}
+                      </div>
+                      <span className="text-xs font-medium text-slate-600 dark:text-slate-300 group-hover:text-indigo-600 transition-colors truncate max-w-[64px]">{c.name.split(' ')[0]}</span>
+                    </Link>
+                  ))
+                ) : null}
               </div>
             </div>
           </div>

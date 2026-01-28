@@ -24,7 +24,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Header />
 
                 {/* Page Content */}
-                <main className="flex-1 container max-w-md mx-auto lg:max-w-7xl px-4 py-8 pb-24 md:pb-12 lg:px-8 lg:py-10">
+                <main className="flex-1 container mx-auto max-w-7xl px-4 py-8 pb-24 md:pb-12 lg:px-8 lg:py-10">
                     {children}
                 </main>
 
