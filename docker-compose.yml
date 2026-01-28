@@ -56,9 +56,20 @@ services:
       - kafka
     environment:
       DATABASE_URL: postgresql+psycopg2://fraud_user:fraud_pwd@postgres:5432/fraud_db
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     ports:
       - "8000:8000"
+
+  ia-worker:
+    build: ./backend
+    container_name: payon-ia-worker
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ML_ENGINE_URL: https://sentinelle-ml-engine-ntqku76mya-ew.a.run.app/score
+    command: python -m app.worker_ia
+
 
 volumes:
   postgres_data:

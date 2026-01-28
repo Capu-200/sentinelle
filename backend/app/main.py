@@ -309,7 +309,6 @@ async def health():
         "ml_engine": ml_engine_status,
     }
 
-<<<<<<< HEAD
 class TransactionCreate(BaseModel):
     source_wallet_id: str
     destination_wallet_id: str
@@ -339,10 +338,8 @@ async def create_transaction(tx: TransactionCreate):
         "transaction_id": tx_id,
         "status": "PENDING",
         "message": "Transaction envoyée pour analyse IA",
-    }# TODO: Ajouter les routes pour users, accounts, transactions, predictions, etc.
-=======
->>>>>>> 037baff057e1f365e361c46a5ea5a27bcb49ed79
-
+    }
+    
 @app.get("/transactions", response_model=list[TransactionResponseLite])
 async def get_transactions(
     current_user: User = Depends(get_current_user),
