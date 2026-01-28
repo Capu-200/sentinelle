@@ -58,14 +58,16 @@ async function getDashboardData(): Promise<DashboardData | null> {
     });
 
     if (!res.ok) {
+      console.error(`Dashboard Fetch Error: ${res.status} ${res.statusText}`);
+      const text = await res.text();
+      console.error(`Response Body: ${text}`);
       if (res.status === 401) return null;
-      console.error("Dashboard fetch failed:", res.status, await res.text());
       return null;
     }
 
     return await res.json();
   } catch (error) {
-    console.error("Dashboard network error:", error);
+    console.error("Dashboard network error details:", error);
     return null;
   }
 }
