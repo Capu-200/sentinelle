@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 
-const API_URL = process.env.API_URL || "https://sentinelle-api-backend-8773685706613.europe-west1.run.app";
+const API_URL = process.env.API_URL || "https://sentinelle-api-backend-ntqku76mya-ew.a.run.app";
 
 export async function addContactAction(formData: FormData) {
     const name = formData.get("name") as string;

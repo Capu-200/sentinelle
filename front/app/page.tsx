@@ -40,7 +40,7 @@ interface DashboardData {
   }[];
 }
 
-const API_URL = process.env.API_URL || "https://sentinelle-api-backend-8773685706613.europe-west1.run.app";
+const API_URL = process.env.API_URL || "https://sentinelle-api-backend-ntqku76mya-ew.a.run.app";
 
 async function getDashboardData(): Promise<DashboardData | null> {
   const cookieStore = await cookies();
