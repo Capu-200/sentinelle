@@ -23,10 +23,10 @@ from contextlib import asynccontextmanager
 from sqlmodel import SQLModel, select, Session
 
 from app.database import get_db, engine
-from .routers import auth, dashboard
+from .routers import auth, dashboard, contacts
 from .auth import get_current_user
 from decimal import Decimal
-from .models import User, Transaction, Wallet, WalletLedger
+from .models import User, Transaction, Wallet, WalletLedger, Contact # Added Contact
 from .schemas import TransactionResponseLite 
 
 @asynccontextmanager
@@ -45,7 +45,7 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],  # Restricted to Frontend URLs
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003", "http://localhost:3004", "http://127.0.0.1:3000"],  # Restricted to Frontend URLs
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,6 +53,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(dashboard.router)
+app.include_router(contacts.router)
 
 # Configuration ML Engine
 ML_ENGINE_URL = os.getenv("ML_ENGINE_URL", "http://localhost:8080")  # À configurer avec l'URL Cloud Run

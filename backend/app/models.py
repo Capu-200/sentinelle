@@ -111,3 +111,16 @@ class HumanReview(SQLModel, table=True):
     comment: Optional[str] = None # TEXT
     final_status: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class Contact(SQLModel, table=True):
+    __tablename__ = "contacts"
+    
+    contact_id: Optional[str] = Field(default=None, primary_key=True)
+    user_id: str = Field(foreign_key="users.user_id") # Owner of the contact
+    
+    name: str
+    email: Optional[str] = None
+    iban: Optional[str] = None
+    
+    linked_user_id: Optional[str] = Field(default=None, foreign_key="users.user_id") # If internal user
+    created_at: datetime = Field(default_factory=datetime.utcnow)
