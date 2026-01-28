@@ -9,10 +9,12 @@ from .database import get_db
 from sqlalchemy.orm import Session
 from .models import User
 
+import os
+
 # Configuration (In production, use env vars)
-SECRET_KEY = "sentinelle_secret_key_change_me_in_production"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 7 days
+SECRET_KEY = os.getenv("SECRET_KEY", "sentinelle_secret_key_change_me_in_production")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080")) # 7 days
 
 ph = PasswordHasher()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")

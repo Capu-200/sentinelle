@@ -21,6 +21,6 @@ cmd /c "gcloud builds submit --tag gcr.io/$PROJECT_ID/$SERVICE_NAME . --project 
 
 # 3. Deploy
 Write-Host "🚀 Deploying to Cloud Run..."
-cmd /c "gcloud run deploy $SERVICE_NAME --image gcr.io/$PROJECT_ID/$SERVICE_NAME --platform managed --region $REGION --project $PROJECT_ID --allow-unauthenticated --add-cloudsql-instances $CONNECTION_NAME --set-env-vars ""DATABASE_URL=postgresql+psycopg2://$($DB_USER):$($DB_PASS)@/$DB_NAME?host=/cloudsql/$CONNECTION_NAME,ML_ENGINE_URL=https://sentinelle-ml-engine-v2-ntqku76mya-ew.a.run.app"""
+cmd /c "gcloud run deploy $SERVICE_NAME --image gcr.io/$PROJECT_ID/$SERVICE_NAME --platform managed --region $REGION --project $PROJECT_ID --allow-unauthenticated --add-cloudsql-instances $CONNECTION_NAME --set-env-vars ""DATABASE_URL=postgresql+psycopg2://$($DB_USER):$($DB_PASS)@/$DB_NAME?host=/cloudsql/$CONNECTION_NAME,ML_ENGINE_URL=https://sentinelle-ml-engine-v2-ntqku76mya-ew.a.run.app,SECRET_KEY=sentinelle_secret_key_change_me_in_production"""
 
 Write-Host "✨ Deployment Complete!" -ForegroundColor Green

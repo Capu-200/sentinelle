@@ -22,6 +22,7 @@ call gcloud run deploy %SERVICE_NAME% ^
   --allow-unauthenticated ^
   --add-cloudsql-instances %CONNECTION_NAME% ^
   --set-env-vars "DATABASE_URL=postgresql+psycopg2://%DB_USER%:%DB_PASS%@/%DB_NAME%?host=/cloudsql/%CONNECTION_NAME%" ^
-  --set-env-vars "ML_ENGINE_URL=https://sentinelle-ml-engine-v2-ntqku76mya-ew.a.run.app"
+  --set-env-vars "ML_ENGINE_URL=https://sentinelle-ml-engine-v2-ntqku76mya-ew.a.run.app" ^
+  --set-env-vars "SECRET_KEY=sentinelle_secret_key_change_me_in_production"
 
 echo ✨ Deployment Complete!

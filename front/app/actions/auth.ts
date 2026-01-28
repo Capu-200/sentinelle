@@ -58,6 +58,9 @@ export async function registerAction(prevState: any, formData: FormData) {
             path: "/",
         });
     } catch (err) {
+        if ((err as Error).message === "NEXT_REDIRECT") {
+            throw err;
+        }
         console.error("Register Error:", err);
         return { error: "Erreur de connexion au serveur" };
     }
@@ -97,6 +100,9 @@ export async function loginAction(prevState: any, formData: FormData) {
             path: "/",
         });
     } catch (err) {
+        if ((err as Error).message === "NEXT_REDIRECT") {
+            throw err;
+        }
         console.error("Login Error:", err);
         return { error: "Erreur de connexion au serveur" };
     }
