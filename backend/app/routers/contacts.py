@@ -109,7 +109,13 @@ async def delete_contact(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    print(f"DEBUG: Attempting to delete contact {contact_id} for user {current_user.user_id}")
     contact = db.get(Contact, contact_id)
+    if not contact:
+        print(f"DEBUG: Contact {contact_id} NOT FOUND in DB.")
+    elif contact.user_id != current_user.user_id:
+        print(f"DEBUG: Contact {contact_id} belongs to {contact.user_id}, not {current_user.user_id}")
+
     if not contact or contact.user_id != current_user.user_id:
         raise HTTPException(status_code=404, detail="Contact not found")
         

@@ -5,6 +5,8 @@ import { ArrowLeft } from "lucide-react";
 import { ActivityList } from "@/components/activity/activity-list";
 import { Transaction, TransactionStatus } from "@/types/transaction";
 
+const API_URL = process.env.API_URL || "http://127.0.0.1:8000";
+
 async function getTransactions(): Promise<Transaction[]> {
     const cookieStore = await cookies();
     const token = cookieStore.get("auth-token");
@@ -12,7 +14,7 @@ async function getTransactions(): Promise<Transaction[]> {
     if (!token) return [];
 
     try {
-        const res = await fetch("http://127.0.0.1:8000/transactions?limit=100", {
+        const res = await fetch(`${API_URL}/transactions?limit=100`, {
             headers: {
                 "Authorization": `Bearer ${token.value}`,
                 "Content-Type": "application/json"

@@ -12,8 +12,19 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import httpx
+import logging
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
+# Configure Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 
 
@@ -56,7 +67,7 @@ app.include_router(dashboard.router)
 app.include_router(contacts.router)
 
 # Configuration ML Engine
-ML_ENGINE_URL = os.getenv("ML_ENGINE_URL", "http://localhost:8080")  # À configurer avec l'URL Cloud Run
+ML_ENGINE_URL = os.getenv("ML_ENGINE_URL", "https://sentinelle-ml-engine-v2-ntqku76mya-ew.a.run.app")  # Cloud Run URL
 
 
 # ========== MODÈLES PYDANTIC ==========
@@ -118,27 +129,46 @@ async def enrich_transaction_with_historical_features(
     }
     
     # Features transactionnelles basiques
+    # Features transactionnelles complètes (alignées sur la doc ML Engine)
+    current_dt = datetime.fromisoformat(transaction.get("created_at") or datetime.utcnow().isoformat())
+    amount_val = float(transaction.get("amount", 0))
+    
     transactional_features = {
-        "amount": transaction.get("amount", 0),
-        "log_amount": __import__("math").log(1 + transaction.get("amount", 0)),
-        "currency_is_pyc": transaction.get("currency") == "PYC",
-        "direction_outgoing": 1 if transaction.get("direction") == "outgoing" else 0,
+        "amount": amount_val,
+        "log_amount": __import__("math").log(1 + amount_val),
+        "currency_is_pyc": 1 if transaction.get("currency") == "PYC" else 0, # Force integer 1/0
+        "direction_outgoing": 1 if str(transaction.get("direction")).upper() == "OUTGOING" else 0,
+        "hour_of_day": current_dt.hour,
+        "day_of_week": current_dt.weekday(), # 0=Monday
+        "transaction_type_TRANSFER": 1 # Hardcoded for now as we only do transfers
     }
     
-    # Construire la transaction enrichie
+    # Récupérer le solde réel du wallet source
+    source_wallet_balance = None
+    if source_wallet_id:
+        wallet = db_session.get(Wallet, source_wallet_id)
+        if wallet:
+            source_wallet_balance = float(wallet.balance)
+
+    # Construire la transaction enrichie (Structure Root attendue par ML Engine V2)
+    # Injecter les features DANS l'objet transaction (Format requis par ML Engine)
+    transaction["features"] = {
+        "transactional": transactional_features,
+        "historical": historical_features,
+    }
+
+    # Construire la transaction enrichie (Structure Root attendue par ML Engine V2)
     enriched = {
         "schema_version": "1.0.0",
         "transaction": transaction,
         "context": {
-            # À compléter avec les vraies données depuis DB
-            "source_wallet": {"balance": None, "status": None},
-            "user": {"status": None, "risk_level": None},
-            "destination_wallet": {"status": None},
-        },
-        "features": {
-            "transactional": transactional_features,
-            "historical": historical_features,
-        },
+            "source_wallet": {
+                "balance": source_wallet_balance, 
+                "status": "ACTIVE"
+            },
+            "user": {"status": "ACTIVE", "risk_level": "LOW"},
+            "destination_wallet": {"status": "ACTIVE"},
+        }
     }
     
     return enriched
@@ -150,32 +180,47 @@ async def call_ml_engine(enriched_transaction: dict) -> dict:
     """
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
+            # Send the enriched structure directly as root payload
+            payload = enriched_transaction
+            
+            tx_id = enriched_transaction.get("transaction", {}).get("transaction_id", "unknown")
+            logger.info(f"ML_ENGINE_REQ: Transaction {tx_id} - Sending payload to {ML_ENGINE_URL}")
+            # logger.debug(f"Payload: {payload}") # Uncomment for full payload debug
+            
             response = await client.post(
                 f"{ML_ENGINE_URL}/score",
-                json={
-                    "transaction": enriched_transaction,
-                    "context": enriched_transaction.get("context", {}),
-                },
+                json=payload,
             )
+            
+            if response.status_code != 200:
+                logger.error(f"ML_ENGINE_ERROR: Status {response.status_code} - Body: {response.text}")
+                
             response.raise_for_status()
-            return response.json()
+            result = response.json()
+            
+            decision = result.get("decision", "UNKNOWN")
+            reasons = result.get("reasons", [])
+            logger.info(f"ML_ENGINE_RESP: Transaction {tx_id} - Decision: {decision} - Reasons: {reasons}")
+            
+            return result
     except httpx.HTTPError as e:
-        # Fallback for demo/dev if ML Engine is down
-        print(f"ML Engine Error: {e}. Using fallback mock.")
+        # Fallback for demo/dev if ML Engine is down -> FAIL CLOSED (BLOCK)
+        logger.critical(f"ML_ENGINE_FAILURE: Network Error: {e}. Defaulting to BLOCK.")
         return {
-            "risk_score": 0.05,
-            "decision": "APPROVE",
-            "reasons": ["fallback_mock"],
-            "model_version": "v0-mock"
+            "risk_score": 1.0,
+            "decision": "BLOCK",
+            "reasons": ["ML_ENGINE_UNAVAILABLE"],
+            "model_version": "fallback"
         }
     except Exception as e:
-        print(f"Connection Error: {e}. Using fallback mock.")
+        logger.critical(f"ML_ENGINE_FAILURE: Unexpected Error: {e}. Defaulting to BLOCK.")
         return {
-            "risk_score": 0.05,
-            "decision": "APPROVE",
-            "reasons": ["fallback_mock"],
-            "model_version": "v0-mock"
+            "risk_score": 1.0,
+            "decision": "BLOCK",
+            "reasons": ["ML_ENGINE_UNAVAILABLE"],
+            "model_version": "fallback"
         }
+
 
 
 async def save_ai_decision(
@@ -381,6 +426,12 @@ async def create_transaction(
             dest_wallet = db.execute(dest_wallet_stmt).scalars().first()
             if dest_wallet:
                 destination_wallet_id = dest_wallet.wallet_id
+
+    # Self-transfer check
+    if destination_wallet_id and destination_wallet_id == transaction_req.source_wallet_id:
+        raise HTTPException(status_code=400, detail="Virement impossible vers le même compte.")
+
+
 
     # 1. Vérification Solde (Pre-check)
     if transaction_req.direction == "OUTGOING":

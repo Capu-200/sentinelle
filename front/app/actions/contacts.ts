@@ -3,6 +3,8 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 
+const API_URL = process.env.API_URL || "http://127.0.0.1:8000";
+
 export async function addContactAction(formData: FormData) {
     const name = formData.get("name") as string;
     const email = formData.get("email") as string;
@@ -20,7 +22,7 @@ export async function addContactAction(formData: FormData) {
         if (email) payload.email = email;
         if (iban) payload.iban = iban;
 
-        const res = await fetch("https://sentinelle-api-backend-873685706613.europe-west1.run.app/contacts/", {
+        const res = await fetch(`${API_URL}/contacts/`, {
             method: "POST",
             headers: {
                 "Authorization": `Bearer ${token.value}`,
@@ -48,14 +50,18 @@ export async function deleteContactAction(contactId: string) {
     if (!token) return { success: false, error: "Unauthorized" };
 
     try {
-        const res = await fetch(`https://sentinelle-api-backend-873685706613.europe-west1.run.app/contacts/${contactId}`, {
+        const res = await fetch(`${API_URL}/contacts/${contactId}`, {
             method: "DELETE",
             headers: {
                 "Authorization": `Bearer ${token.value}`
             }
         });
 
-        if (!res.ok) return { success: false, error: "Failed to delete" };
+        if (!res.ok) {
+            const txt = await res.text();
+            console.error(`Delete failed: ${res.status} - ${txt}`);
+            return { success: false, error: "Failed to delete" };
+        }
 
 
         revalidatePath("/contacts");
@@ -71,7 +77,7 @@ export async function getContactsAction() {
     if (!token) return [];
 
     try {
-        const res = await fetch("https://sentinelle-api-backend-873685706613.europe-west1.run.app/contacts/", {
+        const res = await fetch(`${API_URL}/contacts/`, {
             method: "GET",
             headers: {
                 "Authorization": `Bearer ${token.value}`,

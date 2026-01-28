@@ -5,6 +5,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { GlassCard } from "@/components/ui/glass-card";
 
+const API_URL = process.env.API_URL || "http://127.0.0.1:8000";
+
 async function getUserProfile() {
   const cookieStore = await cookies();
   const token = cookieStore.get("auth-token");
@@ -14,7 +16,7 @@ async function getUserProfile() {
   }
 
   try {
-    const res = await fetch("http://127.0.0.1:8000/dashboard/", {
+    const res = await fetch(`${API_URL}/dashboard/`, {
       headers: {
         "Authorization": `Bearer ${token.value}`,
       },
