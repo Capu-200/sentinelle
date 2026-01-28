@@ -15,9 +15,7 @@ import httpx
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.kafka_producer import publish_transaction_request
-from datetime import datetime
-import uuid
+
 
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -309,39 +307,7 @@ async def health():
         "ml_engine": ml_engine_status,
     }
 
-<<<<<<< HEAD
-class TransactionCreate(BaseModel):
-    source_wallet_id: str
-    destination_wallet_id: str
-    amount: float
-    currency: str = "PAY"
-    description: str | None = None
 
-
-@app.post("/transactions")
-async def create_transaction(tx: TransactionCreate):
-    tx_id = str(uuid.uuid4())
-
-    payload = {
-        "transaction_id": tx_id,
-        "source_wallet_id": tx.source_wallet_id,
-        "destination_wallet_id": tx.destination_wallet_id,
-        "amount": tx.amount,
-        "currency": tx.currency,
-        "description": tx.description,
-        "created_at": datetime.utcnow().isoformat() + "Z",
-    }
-
-    # ✅ Envoi dans Kafka (topic: transaction.requests)
-    publish_transaction_request(payload)
-
-    return {
-        "transaction_id": tx_id,
-        "status": "PENDING",
-        "message": "Transaction envoyée pour analyse IA",
-    }# TODO: Ajouter les routes pour users, accounts, transactions, predictions, etc.
-=======
->>>>>>> 037baff057e1f365e361c46a5ea5a27bcb49ed79
 
 @app.get("/transactions", response_model=list[TransactionResponseLite])
 async def get_transactions(
