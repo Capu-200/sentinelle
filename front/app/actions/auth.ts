@@ -52,7 +52,8 @@ export async function registerAction(prevState: any, formData: FormData) {
         const cookieStore = await cookies();
         cookieStore.set("auth-token", access_token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
+            secure: true, // Always true on Vercel
+            sameSite: 'lax',
             maxAge: 60 * 60 * 24 * 7, // 7 days
             path: "/",
         });
@@ -90,7 +91,8 @@ export async function loginAction(prevState: any, formData: FormData) {
         const cookieStore = await cookies();
         cookieStore.set("auth-token", access_token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
+            secure: true,
+            sameSite: 'lax',
             maxAge: 60 * 60 * 24 * 7, // 7 days
             path: "/",
         });
