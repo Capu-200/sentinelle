@@ -48,7 +48,7 @@ export async function deleteContactAction(contactId: string) {
     if (!token) return { success: false, error: "Unauthorized" };
 
     try {
-        const res = await fetch(`http://127.0.0.1:8000/contacts/${contactId}`, {
+        const res = await fetch(`https://sentinelle-api-backend-873685706613.europe-west1.run.app/contacts/${contactId}`, {
             method: "DELETE",
             headers: {
                 "Authorization": `Bearer ${token.value}`
@@ -71,7 +71,7 @@ export async function getContactsAction() {
     if (!token) return [];
 
     try {
-        const res = await fetch("http://127.0.0.1:8000/contacts/", {
+        const res = await fetch("https://sentinelle-api-backend-873685706613.europe-west1.run.app/contacts/", {
             method: "GET",
             headers: {
                 "Authorization": `Bearer ${token.value}`,
