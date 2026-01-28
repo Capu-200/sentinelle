@@ -80,13 +80,20 @@ export async function loginAction(prevState: any, formData: FormData) {
     }
 
     try {
+        console.log(`[LOGIN] Attempting login for: ${validated.data.email}`);
+        console.log(`[LOGIN] API_URL: ${API_URL}`);
+
         const res = await fetch(`${API_URL}/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(validated.data),
         });
 
+        console.log(`[LOGIN] Response status: ${res.status}`);
+
         if (!res.ok) {
+            const errorText = await res.text();
+            console.error(`[LOGIN] Error response: ${errorText}`);
             return { error: "Identifiants incorrects" };
         }
 
