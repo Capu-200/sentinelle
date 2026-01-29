@@ -25,7 +25,7 @@ class ContactResponse(BaseModel):
     email: Optional[str] = None
     iban: Optional[str] = None
     initials: str
-    is_internal: bool # True if linked to a Sentinelle user
+    is_internal: bool # True if linked to a Payon user
 
     class Config:
         from_attributes = True

@@ -1,4 +1,4 @@
-# 🛡️ Sentinelle ML Engine - Documentation
+# 🛡️ Payon ML Engine - Documentation
 
 Moteur de scoring ML pour la détection de fraude bancaire, déployé sur Google Cloud Run.
 
@@ -208,7 +208,7 @@ models/
 
 ## 🤝 Contribution
 
-Ce projet fait partie de Sentinelle, une application de détection de fraude bancaire.
+Ce projet fait partie de Payon, une application de détection de fraude bancaire.
 
 **Questions ?** Consultez la documentation correspondante ou contactez l'équipe.
 

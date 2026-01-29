@@ -1,8 +1,8 @@
 # Vertex AI Model Monitoring – Service Cloud Run (GCS)
 
-Guide pour monitorer le modèle Sentinelle servi sur **Cloud Run** avec **Vertex AI Model Monitoring v2**, en utilisant **Google Cloud Storage (GCS)** comme source de données.
+Guide pour monitorer le modèle Payon servi sur **Cloud Run** avec **Vertex AI Model Monitoring v2**, en utilisant **Google Cloud Storage (GCS)** comme source de données.
 
-> **Choix Sentinelle** : les logs d’inférence et la baseline sont stockés dans **GCS** (bucket `sentinelle-485209-ml-data`). Vertex lit ces données pour le drift. BigQuery n’est pas utilisé dans cette setup.
+> **Choix Payon** : les logs d’inférence et la baseline sont stockés dans **GCS** (bucket `sentinelle-485209-ml-data`). Vertex lit ces données pour le drift. BigQuery n’est pas utilisé dans cette setup.
 
 ---
 
@@ -19,7 +19,7 @@ L’API ML Engine écrit déjà les scores dans GCS si `MONITORING_GCS_BUCKET` e
 
 ---
 
-## Config Sentinelle (actuelle)
+## Config Payon (actuelle)
 
 | Paramètre      | Valeur |
 |----------------|--------|
@@ -35,7 +35,7 @@ L’API ML Engine écrit déjà les scores dans GCS si `MONITORING_GCS_BUCKET` e
 
 ## Étape 1 – Exporter les données de scoring vers GCS
 
-**Source de données utilisée dans Sentinelle : GCS uniquement.**
+**Source de données utilisée dans Payon : GCS uniquement.**
 
 L’API ML Engine écrit chaque score (ou un échantillon) dans des objets JSONL dans le bucket.
 
@@ -120,7 +120,7 @@ python3 scripts/vertex_setup_monitoring.py
 ## Étape 5 – Lancer des jobs de monitoring
 
 - **À la demande** : console **Vertex AI → Model monitoring** → ouvrir le Model Monitor → **Run now** → choisir la **target** = `gs://sentinelle-485209-ml-data/monitoring/inference_logs/` (ou un sous-dossier contenant des JSONL). Baseline = chemin GCS de la baseline si configurée.
-- **Planifié** : **Schedule a recurring run** → target = même chemin GCS ; pour les fenêtres temporelles, les fichiers doivent contenir un champ `request_time` (déjà le cas dans les logs Sentinelle).
+- **Planifié** : **Schedule a recurring run** → target = même chemin GCS ; pour les fenêtres temporelles, les fichiers doivent contenir un champ `request_time` (déjà le cas dans les logs Payon).
 
 Les résultats (drift par feature, par prédiction, alertes) sont dans la console Monitoring et, si configuré, dans un bucket GCS de sortie.
 
@@ -131,7 +131,7 @@ Les résultats (drift par feature, par prédiction, alertes) sont dans la consol
 | # | Action | Où / Comment |
 |---|--------|--------------|
 | 1 | Exporter entrées + sorties du scoring | API → GCS via `MONITORING_GCS_BUCKET` (un objet JSONL par requête ou par échantillon) |
-| 2 | Enregistrer le modèle Sentinelle | Vertex Model Registry en “reference model” (script ou console) |
+| 2 | Enregistrer le modèle Payon | Vertex Model Registry en “reference model” (script ou console) |
 | 3 | Définir le schéma | `feature_schema.json` + risk_score/decision (script ou manuel) |
 | 4 | Créer le Model Monitor | Script `vertex_setup_monitoring.py` ou console : modèle, schéma, baseline GCS optionnelle, objectifs drift, notifications |
 | 5 | Lancer les jobs | Run now ou Schedule, target = `gs://sentinelle-485209-ml-data/monitoring/inference_logs/` |
@@ -168,7 +168,7 @@ Sur cette page : **Configure monitoring**, liste des Model Monitors, **Run now**
 ## Limites (modèles hors Vertex)
 
 - **Feature attribution** (SHAP) : non supportée pour les reference models. Seuls **feature drift** et **prediction output drift** sont disponibles.
-- **Source de données** : pas de “Vertex Endpoint Logging” pour Cloud Run. Sentinelle utilise **GCS** uniquement pour les inference logs et la baseline.
+- **Source de données** : pas de “Vertex Endpoint Logging” pour Cloud Run. Payon utilise **GCS** uniquement pour les inference logs et la baseline.
 - **Monitoring continu** avec fenêtres temporelles : supporté si les JSONL contiennent un champ **timestamp** (ex. `request_time`) ; c’est le cas dans les logs écrits par l’API.
 
 ---

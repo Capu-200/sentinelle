@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Configure Vertex AI Model Monitoring v2 pour le ML Engine Sentinelle (Cloud Run).
+Configure Vertex AI Model Monitoring v2 pour le ML Engine Payon (Cloud Run).
 
 - Enregistre un reference model dans le Model Registry
 - Crée un Model Monitor (schéma depuis feature_schema.json, baseline GCS optionnelle, alertes)
@@ -68,7 +68,7 @@ def build_monitoring_schema(feature_names: list[str]):
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Vertex AI Model Monitoring – setup Sentinelle")
+    parser = argparse.ArgumentParser(description="Vertex AI Model Monitoring – setup Payon")
     parser.add_argument("--project", default=os.getenv("PROJECT_ID", "sentinelle-485209"))
     parser.add_argument("--region", default=os.getenv("REGION", "europe-west1"))
     parser.add_argument("--model-name", default=os.getenv("MODEL_DISPLAY_NAME", "sentinelle-ml-engine"))
@@ -99,7 +99,7 @@ def main() -> None:
         print("❌ Aucune feature dans le schéma")
         sys.exit(1)
 
-    print("🔧 Vertex AI Model Monitoring – configuration Sentinelle")
+    print("🔧 Vertex AI Model Monitoring – configuration Payon")
     print(f"   Projet: {args.project}")
     print(f"   Région: {args.region}")
     print(f"   Modèle: {args.model_name}")

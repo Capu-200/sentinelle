@@ -22,7 +22,7 @@ export function TransactionLoader() {
             </div>
 
             <h3 className="text-lg font-semibold text-foreground tracking-tight">
-                Vérification Sentinelle
+                Vérification Payon
             </h3>
 
             <p className="text-sm text-muted-foreground mt-1">

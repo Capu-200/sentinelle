@@ -60,7 +60,7 @@ export default function LoginPage() {
             <div className="w-full max-w-md">
                 <div className="text-center mb-8">
                     <h1 className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 mb-2">
-                        Sentinelle
+                        Payon
                     </h1>
                     <p className="text-slate-600 dark:text-slate-400">
                         Sécurisez vos transactions en temps réel

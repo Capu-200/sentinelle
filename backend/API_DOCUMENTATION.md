@@ -1,6 +1,6 @@
-# Sentinelle API Documentation
+# Payon API Documentation
 
-Cette documentation détaille les endpoints disponibles sur l'API Backend de Sentinelle.
+Cette documentation détaille les endpoints disponibles sur l'API Backend de Payon.
 
 **Base URL (Vercel Prod):** `https://sentinelle-api-backend-8773685706613.europe-west1.run.app`
 **Base URL (Local):** `http://127.0.0.1:8000`

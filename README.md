@@ -1,4 +1,4 @@
-# 🛡️ Sentinelle - Détection de Fraude Bancaire
+# 🛡️ Payon - Détection de Fraude Bancaire
 
 Application de détection de fraude bancaire avec backend FastAPI et base de données PostgreSQL hébergée sur Google Cloud SQL.
 

@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(
-    title="Sentinelle Fraud Detection API",
+    title="Payon Fraud Detection API",
     description="API backend pour la détection de fraude bancaire",
     version="1.0.0",
     lifespan=lifespan
@@ -334,7 +334,7 @@ async def root():
     """Health check endpoint"""
     return {
         "status": "ok",
-        "message": "Sentinelle Fraud Detection API",
+        "message": "Payon Fraud Detection API",
         "version": "1.0.0",
         "ml_engine_url": ML_ENGINE_URL,
     }
