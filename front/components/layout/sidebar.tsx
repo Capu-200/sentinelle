@@ -30,7 +30,7 @@ export const Sidebar = () => {
                     <div className="h-8 w-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold">
                         P
                     </div>
-                    <span className="text-xl font-bold tracking-tight">PAYONE</span>
+                    <span className="text-xl font-bold tracking-tight">PAYON</span>
                 </div>
             </div>
 
