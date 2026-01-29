@@ -204,6 +204,18 @@ export function TransferForm({ contacts: initialContacts }: Props) {
                 </div>
             </div>
 
+            {/* Comment Field (Optional) */}
+            <div className="space-y-2">
+                <label htmlFor="comment" className="text-sm font-medium text-muted-foreground ml-1">Commentaire (optionnel)</label>
+                <textarea
+                    name="comment"
+                    id="comment"
+                    rows={2}
+                    placeholder="Ajoutez une note à cette transaction..."
+                    className="w-full rounded-xl border-0 bg-slate-100 px-4 py-3 text-sm outline-none ring-1 ring-transparent focus:bg-white focus:ring-primary/20 transition-all dark:bg-slate-800 dark:focus:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 resize-none"
+                />
+            </div>
+
             {/* Giant Amount Input (Centered vertically) */}
             <div className="flex-1 flex flex-col items-center justify-center gap-4 min-h-[200px]">
                 <label htmlFor="amount" className="text-sm font-medium text-muted-foreground uppercase tracking-widest">

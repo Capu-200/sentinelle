@@ -4,7 +4,7 @@ FastAPI Application - Fraud Detection Backend
 import os
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from dotenv import load_dotenv
 
@@ -103,7 +103,7 @@ class TransactionResponse(BaseModel):
     transaction_id: str
     risk_score: float
     decision: str
-    reasons: list[str]
+    reasons: List[str]
     model_version: str
 
 
@@ -362,7 +362,7 @@ async def health():
 
 
 
-@app.get("/transactions", response_model=list[TransactionResponseLite])
+@app.get("/transactions", response_model=List[TransactionResponseLite])
 async def get_transactions(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -372,6 +372,7 @@ async def get_transactions(
     """
     Récupère l'historique des transactions de l'utilisateur connecté.
     (Initiateur OU Destinataire)
+    Enrichi avec les informations de pays source et destination.
     """
     user_wallets_stmt = select(Wallet.wallet_id).where(Wallet.user_id == current_user.user_id)
     user_wallet_ids = db.execute(user_wallets_stmt).scalars().all()
@@ -393,18 +394,62 @@ async def get_transactions(
     )
     transactions = db.execute(stmt).scalars().all()
     
-    return [
-        TransactionResponseLite(
-            transaction_id=tx.transaction_id,
-            amount=float(tx.amount),
-            currency=tx.currency,
-            transaction_type=tx.transaction_type,
-            direction="INCOMING" if tx.destination_wallet_id in user_wallet_ids and tx.source_wallet_id not in user_wallet_ids else tx.direction,
-            status=tx.kyc_status,
-            recipient_name=tx.description or "Destinataire Inconnu",
-            created_at=tx.created_at
-        ) for tx in transactions
-    ]
+    result = []
+    for tx in transactions:
+        # Déterminer la direction relative à l'utilisateur actuel
+        is_incoming = tx.destination_wallet_id in user_wallet_ids and tx.source_wallet_id not in user_wallet_ids
+        direction = "INCOMING" if is_incoming else tx.direction
+        
+        # Récupérer le pays source (initiateur)
+        source_country = "FR" # Fallback par défaut si info manquante
+        if tx.initiator_user_id:
+            initiator_stmt = select(User).where(User.user_id == tx.initiator_user_id)
+            initiator = db.execute(initiator_stmt).scalars().first()
+            if initiator and initiator.country_home:
+                source_country = initiator.country_home
+        
+        # Récupérer le pays destination (destinataire)
+        destination_country = None
+        recipient_email = None
+        if tx.destination_wallet_id:
+            # Trouver l'utilisateur propriétaire du wallet de destination
+            dest_wallet_stmt = select(Wallet).where(Wallet.wallet_id == tx.destination_wallet_id)
+            dest_wallet = db.execute(dest_wallet_stmt).scalars().first()
+            if dest_wallet and dest_wallet.user_id:
+                dest_user_stmt = select(User).where(User.user_id == dest_wallet.user_id)
+                dest_user = db.execute(dest_user_stmt).scalars().first()
+                if dest_user:
+                    destination_country = dest_user.country_home
+                    recipient_email = dest_user.email
+        
+        # Nom du destinataire (Logique améliorée pour éviter doublon commentaire)
+        # Priorité: 1. Description (sauf si c'est un commentaire long) 2. Email 3. Inconnu
+        # Si description == comment, on évite de l'utiliser comme Nom
+        
+        recipient_name = "Destinataire Inconnu"
+        if recipient_email:
+             recipient_name = recipient_email
+        elif tx.description and len(tx.description) < 30: # Use description as name only if short-ish
+             recipient_name = tx.description
+        
+        result.append(
+            TransactionResponseLite(
+                transaction_id=tx.transaction_id,
+                amount=float(tx.amount),
+                currency=tx.currency,
+                transaction_type=tx.transaction_type,
+                direction=direction,
+                status=tx.kyc_status,
+                recipient_name=recipient_name,
+                recipient_email=recipient_email,
+                created_at=tx.created_at,
+                source_country=source_country,
+                destination_country=destination_country,
+                comment=tx.description  # Utiliser description comme commentaire
+            )
+        )
+    
+    return result
 
 
 @app.post("/transactions", response_model=TransactionResponse)
@@ -529,3 +574,45 @@ async def create_transaction(
         reasons=scoring_result.get("reasons", []),
         model_version=scoring_result.get("model_version", "unknown"),
     )
+
+
+class CommentUpdate(BaseModel):
+    comment: str
+
+@app.patch("/transactions/{transaction_id}/comment")
+async def update_transaction_comment(
+    transaction_id: str,
+    comment_data: CommentUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Met à jour le commentaire d'une transaction.
+    Accessible uniquement par l'initiateur ou le bénéficiaire (si wallet interne).
+    """
+    # 1. Récupérer la transaction
+    tx = db.get(Transaction, transaction_id)
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction introuvable")
+    
+    # 2. Vérifier l'autorisation (Ownership)
+    stmt = select(Wallet.wallet_id).where(Wallet.user_id == current_user.user_id)
+    user_wallet_ids = db.execute(stmt).scalars().all()
+
+    is_initiator = tx.initiator_user_id == current_user.user_id
+    is_source_owner = tx.source_wallet_id in (user_wallet_ids or [])
+    is_dest_owner = tx.destination_wallet_id in (user_wallet_ids or [])
+    
+    if not (is_initiator or is_source_owner or is_dest_owner):
+        raise HTTPException(status_code=403, detail="Non autorisé à modifier cette transaction")
+
+    # 3. Validation (Longueur)
+    if len(comment_data.comment) > 500:
+        raise HTTPException(status_code=400, detail="Commentaire trop long (max 500 caractères)")
+
+    # 4. Mise à jour
+    tx.description = comment_data.comment
+    db.add(tx)
+    db.commit()
+    
+    return {"status": "success", "message": "Commentaire mis à jour"}
