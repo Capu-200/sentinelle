@@ -32,11 +32,14 @@ async function getTransactions(): Promise<Transaction[]> {
         return data.map((t: any) => ({
             id: t.transaction_id,
             amount: t.amount,
-            recipient: t.recipient_name || "Inconnu",
-            // Map simple status or pass as is if it matches enum
+            recipient: t.recipient_name || t.recipient_email || "Inconnu",
             status: t.status as TransactionStatus,
             date: t.created_at,
-            direction: t.direction // Mapped from backend
+            direction: t.direction,
+            sourceCountry: t.source_country,           // Directement depuis le backend
+            destinationCountry: t.destination_country, // Directement depuis le backend
+            comment: t.comment,                        // Commentaire depuis le backend
+            recipientIban: t.recipient_iban            // IBAN si disponible
         }));
 
     } catch (error) {

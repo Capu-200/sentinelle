@@ -37,7 +37,11 @@ class TransactionResponseLite(BaseModel):
     direction: str
     status: str
     recipient_name: Optional[str] = "Unknown"
+    recipient_email: Optional[str] = None
     created_at: datetime
+    source_country: Optional[str] = None
+    destination_country: Optional[str] = None
+    comment: Optional[str] = None
 
 class UserProfileResponse(BaseModel):
     user_id: str
