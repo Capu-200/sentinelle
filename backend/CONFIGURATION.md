@@ -7,13 +7,13 @@ L'URL du ML Engine doit être configurée dans une variable d'environnement.
 ### URL Actuelle
 
 ```
-https://sentinelle-ml-engine-ntqku76mya-ew.a.run.app
+https://sentinelle-ml-engine-v2-ntqku76mya-ew.a.run.app
 ```
 
 ### Comment Récupérer l'URL
 
 ```bash
-gcloud run services describe sentinelle-ml-engine \
+gcloud run services describe sentinelle-ml-engine-v2 \
   --region=europe-west1 \
   --project=sentinelle-485209 \
   --format="value(status.url)"
@@ -37,7 +37,7 @@ cp .env.example .env
 Éditez `.env` et mettez à jour l'URL :
 
 ```bash
-ML_ENGINE_URL=https://sentinelle-ml-engine-ntqku76mya-ew.a.run.app
+ML_ENGINE_URL=https://sentinelle-ml-engine-v2-ntqku76mya-ew.a.run.app
 ```
 
 ### 3. Charger les variables d'environnement
@@ -63,7 +63,7 @@ Pour le backend déployé sur Cloud Run, configurez les variables d'environnemen
 
 ```bash
 gcloud run deploy sentinelle-backend \
-  --set-env-vars="ML_ENGINE_URL=https://sentinelle-ml-engine-873685706613.europe-west1.run.app" \
+  --set-env-vars="ML_ENGINE_URL=https://sentinelle-ml-engine-v2-ntqku76mya-ew.a.run.app" \
   --region=europe-west1 \
   --project=sentinelle-485209
 ```
@@ -76,7 +76,7 @@ Si vous redéployez le ML Engine et que l'URL change :
 
 1. **Récupérer la nouvelle URL** :
    ```bash
-   gcloud run services describe sentinelle-ml-engine \
+   gcloud run services describe sentinelle-ml-engine-v2 \
      --region=europe-west1 \
      --project=sentinelle-485209 \
      --format="value(status.url)"
@@ -103,7 +103,7 @@ Si vous redéployez le ML Engine et que l'URL change :
 
 ```bash
 # Health check
-curl https://sentinelle-ml-engine-873685706613.europe-west1.run.app/health
+curl https://sentinelle-ml-engine-v2-ntqku76mya-ew.a.run.app/health
 
 # Depuis le backend
 curl http://localhost:8000/health
