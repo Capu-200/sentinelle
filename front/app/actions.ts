@@ -3,7 +3,8 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 
-const API_URL = process.env.API_URL || "https://sentinelle-api-backend-ntqku76mya-ew.a.run.app";
+// Bypass environment variables because Next.js has cached the local one
+const API_URL = "https://sentinelle-api-backend-ntqku76mya-ew.a.run.app";
 
 const ERROR_MESSAGES: Record<string, string> = {
     "RULE_MAX_AMOUNT": "Montant supérieur à la limite autorisée (300 PYC).",

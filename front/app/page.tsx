@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { ArrowRight, CreditCard, Download, MoreHorizontal, Plus, Send, Wallet } from "lucide-react";
+import { ArrowRight, CreditCard, Download, MoreHorizontal, Plus, Send, Wallet, HandCoins } from "lucide-react";
 import { TransactionItem } from "@/components/transactions/transaction-item";
+import { ContactHomeItem } from "@/components/contacts/contact-home-item";
 import { Transaction, TransactionStatus } from "@/types/transaction";
 import { GlassCard } from "@/components/ui/glass-card";
 import { ActionButton } from "@/components/ui/action-button";
 import { AnalyticsChart } from "@/components/ui/chart";
+import { PendingRequestsWidget } from "@/components/ui/pending-requests-widget";
 import { cn } from "@/lib/utils";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -40,7 +42,7 @@ interface DashboardData {
   }[];
 }
 
-const API_URL = process.env.API_URL || "https://sentinelle-api-backend-ntqku76mya-ew.a.run.app";
+const API_URL = "https://sentinelle-api-backend-ntqku76mya-ew.a.run.app";
 
 async function getDashboardData(): Promise<DashboardData | null> {
   const cookieStore = await cookies();
@@ -79,9 +81,47 @@ export default async function Home() {
     redirect("/login");
   }
 
+  // Load simulated requests from cookies
+  const cookieStore = await cookies();
+  const requestsCookie = cookieStore.get("mock_requests");
+  let mockRequests: any[] = [];
+  if (requestsCookie) {
+    try {
+      mockRequests = JSON.parse(requestsCookie.value);
+    } catch(e) {}
+  }
+
+  // Fake a received request if none exists to show the user both flows
+  if (!mockRequests.find((r: any) => r.id === "fake-req-001")) {
+      mockRequests.push({
+          id: "fake-req-001",
+          to: "john.doe@payon.app",
+          from_name: "Service PayOn",
+          amount: 50.00,
+          comment: "Pour le test d'intégration !",
+          status: "PENDING",
+          direction: "RECEIVED",
+          date: new Date().toISOString()
+      });
+  }
+
   const { user, wallet, recent_transactions, contacts } = dashboardData;
 
-  const recentTransactions: Transaction[] = recent_transactions.map(t => ({
+  const userEmail = user.email;
+
+  // IMPORTANT: Re-evaluate direction dynamically so both sides see the proper oriented view!
+  mockRequests = mockRequests
+    .filter((r: any) => r.to === userEmail || r.from === userEmail || r.id === "fake-req-001")
+    .map((r: any) => {
+        // If the request was addressed TO the current user, it is RECEIVED by them
+        const isReceived = r.to === userEmail || (r.id === "fake-req-001" && r.direction === "RECEIVED");
+        return {
+            ...r,
+            direction: isReceived ? "RECEIVED" : "SENT"
+        };
+    });
+
+  const recentTransactions: Transaction[] = recent_transactions.map((t: any) => ({
     id: t.transaction_id,
     amount: t.amount,
     recipient: t.recipient_name || "Inconnu",
@@ -89,6 +129,18 @@ export default async function Home() {
     date: t.created_at,
     direction: t.direction as 'INCOMING' | 'OUTGOING' // Explicitly map direction
   }));
+
+  const resolvedRequests = mockRequests.filter((r: any) => r.status !== "PENDING").map((r: any) => ({
+    id: r.id,
+    amount: r.amount,
+    recipient: r.direction === "RECEIVED" ? (r.from_name || r.from || "Contact") : r.to,
+    status: r.status === "ACCEPTED" ? "VALIDATED" : "REJECTED",  // Map to TransactionStatus
+    date: r.date,
+    direction: r.direction === "RECEIVED" ? "OUTGOING" : "INCOMING", // If I received a request and accepted it, I sent money (OUTGOING)
+    comment: r.comment ? `Suite à demande : ${r.comment}` : "Suite à une demande"
+  }));
+
+  const allTransactions = [...recentTransactions, ...resolvedRequests].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const formatCurrency = (amount: number, currency: string) => {
     // If currency is PYC, just append string. Otherwise use intl.
@@ -221,12 +273,17 @@ export default async function Home() {
 
           {/* Actions Row */}
           <div className="grid grid-cols-1 gap-6">
+
+            {mockRequests.length > 0 && (
+              <PendingRequestsWidget requests={mockRequests} />
+            )}
+
             {/* Quick Actions */}
             <div className="space-y-4">
               <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider px-1">Accès Rapide</h2>
               <div className="grid grid-cols-2 gap-4">
                 <ActionButton icon={Send} label="Envoyer" href="/transfer" variant="accent" />
-                <ActionButton icon={Download} label="Recevoir" href="/receive" />
+                <ActionButton icon={HandCoins} label="Demander" href="/request" />
               </div>
             </div>
 
@@ -247,14 +304,7 @@ export default async function Home() {
 
                 {contacts && contacts.length > 0 ? (
                   contacts.slice(0, 5).map((c, i) => (
-                    <Link key={i} href={`/transfer?to=${c.email || c.iban}`} className="flex flex-col items-center gap-2 min-w-[64px] group">
-                      <div className={cn("h-16 w-16 rounded-2xl flex items-center justify-center font-bold text-xl shadow-sm group-hover:scale-105 group-hover:shadow-md transition-all",
-                        c.is_internal ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
-                      )}>
-                        {c.name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()}
-                      </div>
-                      <span className="text-xs font-medium text-slate-600 dark:text-slate-300 group-hover:text-indigo-600 transition-colors truncate max-w-[64px]">{c.name.split(' ')[0]}</span>
-                    </Link>
+                    <ContactHomeItem key={i} contact={c as any} />
                   ))
                 ) : null}
               </div>
@@ -272,9 +322,13 @@ export default async function Home() {
               </Link>
             </div>
 
-            <div className="flex flex-col gap-3 overflow-y-auto pr-1 flex-1 custom-scrollbar" style={{ maxHeight: '600px' }}>
-              {recentTransactions.length > 0 ? (
-                recentTransactions.map((t) => (
+            <style dangerouslySetInnerHTML={{__html: `
+              .no-scrollbar::-webkit-scrollbar { display: none; }
+              .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}} />
+            <div className="flex flex-col gap-3 overflow-y-auto pr-1 flex-1 no-scrollbar" style={{ maxHeight: '600px' }}>
+              {allTransactions.length > 0 ? (
+                allTransactions.map((t: any) => (
                   <TransactionItem key={t.id} transaction={t} />
                 ))
               ) : (
