@@ -14,6 +14,13 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    new_password: str
+
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -37,7 +44,11 @@ class TransactionResponseLite(BaseModel):
     direction: str
     status: str
     recipient_name: Optional[str] = "Unknown"
+    recipient_email: Optional[str] = None
     created_at: datetime
+    source_country: Optional[str] = None
+    destination_country: Optional[str] = None
+    comment: Optional[str] = None
 
 class UserProfileResponse(BaseModel):
     user_id: str

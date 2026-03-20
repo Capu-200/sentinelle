@@ -3,7 +3,8 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 
-const API_URL = process.env.API_URL || "https://sentinelle-api-backend-ntqku76mya-ew.a.run.app";
+// Bypass environment variables because Next.js has cached the local one
+const API_URL = "https://sentinelle-api-backend-ntqku76mya-ew.a.run.app";
 
 const ERROR_MESSAGES: Record<string, string> = {
     "RULE_MAX_AMOUNT": "Montant supérieur à la limite autorisée (300 PYC).",
@@ -62,6 +63,7 @@ export async function createTransferAction(prevState: any, formData: FormData) {
 
     const recipient = formData.get("recipient") as string;
     const amountStr = formData.get("amount") as string;
+    const comment = formData.get("comment") as string;
     const amount = parseFloat(amountStr.replace(',', '.'));
 
     if (isNaN(amount) || amount <= 0) {
@@ -76,10 +78,11 @@ export async function createTransferAction(prevState: any, formData: FormData) {
         transaction_type: "TRANSFER",
         direction: "OUTGOING",
         initiator_user_id: userId,
-        description: `Virement à ${recipient}`,
+        description: comment || `Virement à ${recipient}`,
         recipient_email: recipient,
         city: "Paris",
-        country: "FR"
+        country: "FR",
+        comment: comment || undefined // Ajout du commentaire utilisateur
     };
 
     // 3. Send to Backend
