@@ -61,12 +61,12 @@ export async function registerAction(prevState: any, formData: FormData) {
         const { access_token } = await res.json();
         const cookieStore = await cookies();
 
-        const isProduction = process.env.NODE_ENV === 'production';
-        console.log(`[REGISTER] Setting cookie - Production: ${isProduction}`);
+        const isSecureContext = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+        console.log(`[REGISTER] Setting cookie - SecureContext: ${isSecureContext}`);
 
         cookieStore.set("auth-token", access_token, {
             httpOnly: true,
-            secure: isProduction,
+            secure: isSecureContext,
             sameSite: 'lax',
             maxAge: 60 * 60 * 24 * 7,
             path: "/",
@@ -114,12 +114,15 @@ export async function loginAction(prevState: any, formData: FormData) {
         const { access_token } = await res.json();
         const cookieStore = await cookies();
 
-        const isProduction = process.env.NODE_ENV === 'production';
-        console.log(`[LOGIN] Setting cookie - Production: ${isProduction}`);
+        // On Vercel (and any HTTPS host), cookies must be secure=true.
+        // We use VERCEL env var (automatically set by Vercel) as the most reliable signal.
+        // NODE_ENV is not reliable because Next.js runs in production mode even on preview branches.
+        const isSecureContext = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+        console.log(`[LOGIN] Setting cookie - SecureContext: ${isSecureContext}, VERCEL: ${process.env.VERCEL}`);
 
         cookieStore.set("auth-token", access_token, {
             httpOnly: true,
-            secure: isProduction,
+            secure: isSecureContext,
             sameSite: 'lax',
             maxAge: 60 * 60 * 24 * 7,
             path: "/",
