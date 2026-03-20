@@ -133,3 +133,71 @@ export async function logoutAction() {
     cookieStore.delete("auth-token");
     redirect("/login");
 }
+
+// Unified state type — avoids useActionState overload TS error on Vercel
+export type AuthActionState = { error: string; success: boolean; message: string };
+
+export async function forgotPasswordAction(
+    prevState: AuthActionState,
+    formData: FormData
+): Promise<AuthActionState> {
+    const email = formData.get("email") as string;
+
+    if (!email || !email.includes("@")) {
+        return { error: "Email invalide.", success: false, message: "" };
+    }
+
+    try {
+        const res = await fetch(`${API_URL}/auth/forgot-password`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email }),
+        });
+
+        if (!res.ok) {
+            return { error: "Erreur lors de l'envoi. Réessayez.", success: false, message: "" };
+        }
+
+        const data = await res.json();
+        return {
+            success: true,
+            error: "",
+            message: data.reset_link || data.message || "Lien de réinitialisation généré.",
+        };
+    } catch {
+        return { error: "Erreur réseau. Réessayez.", success: false, message: "" };
+    }
+}
+
+export async function resetPasswordAction(
+    prevState: AuthActionState,
+    formData: FormData
+): Promise<AuthActionState> {
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+    const confirm = formData.get("confirm") as string;
+
+    if (!password || password.length < 6) {
+        return { error: "Le mot de passe doit contenir au moins 6 caractères.", success: false, message: "" };
+    }
+
+    if (password !== confirm) {
+        return { error: "Les mots de passe ne correspondent pas.", success: false, message: "" };
+    }
+
+    try {
+        const res = await fetch(`${API_URL}/auth/reset-password`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, new_password: password }),
+        });
+
+        if (!res.ok) {
+            return { error: "Erreur lors de la réinitialisation.", success: false, message: "" };
+        }
+
+        return { success: true, error: "", message: "Mot de passe mis à jour avec succès !" };
+    } catch {
+        return { error: "Erreur réseau. Réessayez.", success: false, message: "" };
+    }
+}
