@@ -2,8 +2,9 @@
 
 import { useActionState, useState, useEffect } from 'react';
 import { useFormStatus } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { GlassCard } from '@/components/ui/glass-card';
-import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2, User } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2, User, Globe } from 'lucide-react';
 import Link from 'next/link';
 import { registerAction } from '../actions/auth';
 import toast from 'react-hot-toast';
@@ -11,6 +12,7 @@ import { cn } from '@/lib/utils';
 
 const initialState = {
     error: '',
+    success: false,
 };
 
 function SubmitButton() {
@@ -35,6 +37,7 @@ function SubmitButton() {
 }
 
 export default function RegisterPage() {
+    const router = useRouter();
     const [state, dispatch] = useActionState(registerAction, initialState);
     const [showPassword, setShowPassword] = useState(false);
 
@@ -46,7 +49,12 @@ export default function RegisterPage() {
         if (state?.error) {
             toast.error(state.error);
         }
-    }, [state]);
+        if (state?.success) {
+            toast.success('Compte créé avec succès !');
+            // Redirection côté client pour garantir que le cookie est bien envoyé
+            setTimeout(() => router.push('/'), 100);
+        }
+    }, [state, router]);
 
     return (
         <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
@@ -103,6 +111,25 @@ export default function RegisterPage() {
                                     placeholder="jacques@payon.app"
                                     className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium placeholder:text-slate-400"
                                 />
+                            </div>
+                        </div>
+
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold ml-1 text-slate-700 dark:text-slate-300">Pays de résidence</label>
+                            <div className="relative group">
+                                <Globe className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                                <select
+                                    name="country_home"
+                                    required
+                                    className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium appearance-none text-slate-900 dark:text-slate-200"
+                                >
+                                    <option value="FR">France</option>
+                                    <option value="BE">Belgique</option>
+                                    <option value="CH">Suisse</option>
+                                    <option value="CA">Canada</option>
+                                    <option value="OTHER">Autre</option>
+                                </select>
                             </div>
                         </div>
 

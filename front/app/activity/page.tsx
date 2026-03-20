@@ -5,6 +5,8 @@ import { ArrowLeft } from "lucide-react";
 import { ActivityList } from "@/components/activity/activity-list";
 import { Transaction, TransactionStatus } from "@/types/transaction";
 
+const API_URL = "https://sentinelle-api-backend-ntqku76mya-ew.a.run.app";
+
 async function getTransactions(): Promise<Transaction[]> {
     const cookieStore = await cookies();
     const token = cookieStore.get("auth-token");
@@ -12,7 +14,7 @@ async function getTransactions(): Promise<Transaction[]> {
     if (!token) return [];
 
     try {
-        const res = await fetch("http://127.0.0.1:8000/transactions?limit=100", {
+        const res = await fetch(`${API_URL}/transactions?limit=100`, {
             headers: {
                 "Authorization": `Bearer ${token.value}`,
                 "Content-Type": "application/json"
@@ -30,11 +32,14 @@ async function getTransactions(): Promise<Transaction[]> {
         return data.map((t: any) => ({
             id: t.transaction_id,
             amount: t.amount,
-            recipient: t.recipient_name || "Inconnu",
-            // Map simple status or pass as is if it matches enum
+            recipient: t.recipient_name || t.recipient_email || "Inconnu",
             status: t.status as TransactionStatus,
             date: t.created_at,
-            direction: t.direction // Mapped from backend
+            direction: t.direction,
+            sourceCountry: t.source_country,           // Directement depuis le backend
+            destinationCountry: t.destination_country, // Directement depuis le backend
+            comment: t.comment,                        // Commentaire depuis le backend
+            recipientIban: t.recipient_iban            // IBAN si disponible
         }));
 
     } catch (error) {

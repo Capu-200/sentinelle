@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { ArrowRight, CreditCard, Download, MoreHorizontal, Plus, Send, Wallet } from "lucide-react";
+import { ArrowRight, CreditCard, Download, MoreHorizontal, Plus, Send, Wallet, HandCoins } from "lucide-react";
 import { TransactionItem } from "@/components/transactions/transaction-item";
+import { ContactHomeItem } from "@/components/contacts/contact-home-item";
 import { Transaction, TransactionStatus } from "@/types/transaction";
 import { GlassCard } from "@/components/ui/glass-card";
 import { ActionButton } from "@/components/ui/action-button";
 import { AnalyticsChart } from "@/components/ui/chart";
+import { PendingRequestsWidget } from "@/components/ui/pending-requests-widget";
 import { cn } from "@/lib/utils";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -32,7 +34,15 @@ interface DashboardData {
     recipient_name: string;
     created_at: string;
   }[];
+  contacts?: {
+    name: string;
+    email?: string;
+    iban?: string;
+    is_internal: boolean;
+  }[];
 }
+
+const API_URL = "https://sentinelle-api-backend-ntqku76mya-ew.a.run.app";
 
 async function getDashboardData(): Promise<DashboardData | null> {
   const cookieStore = await cookies();
@@ -41,7 +51,7 @@ async function getDashboardData(): Promise<DashboardData | null> {
   if (!token) return null;
 
   try {
-    const res = await fetch("http://127.0.0.1:8000/dashboard/", {
+    const res = await fetch(`${API_URL}/dashboard/`, {
       headers: {
         "Authorization": `Bearer ${token.value}`,
         "Content-Type": "application/json"
@@ -50,14 +60,16 @@ async function getDashboardData(): Promise<DashboardData | null> {
     });
 
     if (!res.ok) {
+      console.error(`Dashboard Fetch Error: ${res.status} ${res.statusText}`);
+      const text = await res.text();
+      console.error(`Response Body: ${text}`);
       if (res.status === 401) return null;
-      console.error("Dashboard fetch failed:", res.status, await res.text());
       return null;
     }
 
     return await res.json();
   } catch (error) {
-    console.error("Dashboard network error:", error);
+    console.error("Dashboard network error details:", error);
     return null;
   }
 }
@@ -69,9 +81,47 @@ export default async function Home() {
     redirect("/login");
   }
 
-  const { user, wallet, recent_transactions } = dashboardData;
+  // Load simulated requests from cookies
+  const cookieStore = await cookies();
+  const requestsCookie = cookieStore.get("mock_requests");
+  let mockRequests: any[] = [];
+  if (requestsCookie) {
+    try {
+      mockRequests = JSON.parse(requestsCookie.value);
+    } catch(e) {}
+  }
 
-  const recentTransactions: Transaction[] = recent_transactions.map(t => ({
+  // Fake a received request if none exists to show the user both flows
+  if (!mockRequests.find((r: any) => r.id === "fake-req-001")) {
+      mockRequests.push({
+          id: "fake-req-001",
+          to: "john.doe@payon.app",
+          from_name: "Service PayOn",
+          amount: 50.00,
+          comment: "Pour le test d'intégration !",
+          status: "PENDING",
+          direction: "RECEIVED",
+          date: new Date().toISOString()
+      });
+  }
+
+  const { user, wallet, recent_transactions, contacts } = dashboardData;
+
+  const userEmail = user.email;
+
+  // IMPORTANT: Re-evaluate direction dynamically so both sides see the proper oriented view!
+  mockRequests = mockRequests
+    .filter((r: any) => r.to === userEmail || r.from === userEmail || r.id === "fake-req-001")
+    .map((r: any) => {
+        // If the request was addressed TO the current user, it is RECEIVED by them
+        const isReceived = r.to === userEmail || (r.id === "fake-req-001" && r.direction === "RECEIVED");
+        return {
+            ...r,
+            direction: isReceived ? "RECEIVED" : "SENT"
+        };
+    });
+
+  const recentTransactions: Transaction[] = recent_transactions.map((t: any) => ({
     id: t.transaction_id,
     amount: t.amount,
     recipient: t.recipient_name || "Inconnu",
@@ -80,16 +130,25 @@ export default async function Home() {
     direction: t.direction as 'INCOMING' | 'OUTGOING' // Explicitly map direction
   }));
 
+  const resolvedRequests = mockRequests.filter((r: any) => r.status !== "PENDING").map((r: any) => ({
+    id: r.id,
+    amount: r.amount,
+    recipient: r.direction === "RECEIVED" ? (r.from_name || r.from || "Contact") : r.to,
+    status: r.status === "ACCEPTED" ? "VALIDATED" : "REJECTED",  // Map to TransactionStatus
+    date: r.date,
+    direction: r.direction === "RECEIVED" ? "OUTGOING" : "INCOMING", // If I received a request and accepted it, I sent money (OUTGOING)
+    comment: r.comment ? `Suite à demande : ${r.comment}` : "Suite à une demande"
+  }));
+
+  const allTransactions = [...recentTransactions, ...resolvedRequests].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
   const formatCurrency = (amount: number, currency: string) => {
+    // If currency is PYC, just append string. Otherwise use intl.
+    if (currency === "PYC" || currency === "EUR") { // Treating legacy EUR as PYC for display consistency if any remains
+      return new Intl.NumberFormat('fr-FR', { style: 'decimal', minimumFractionDigits: 2 }).format(amount) + " PYC";
+    }
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: currency }).format(amount);
   };
-
-  const quickUsers = [
-    { name: "Alice", avatar: "A", color: "bg-pink-100 text-pink-600 dark:bg-pink-900/40 dark:text-pink-400" },
-    { name: "Bob", avatar: "B", color: "bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400" },
-    { name: "Charlie", avatar: "C", color: "bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400" },
-    { name: "David", avatar: "D", color: "bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400" },
-  ];
 
   // Helper for Risk Level Badge
   const getRiskBadgeColor = (level: string) => {
@@ -213,13 +272,18 @@ export default async function Home() {
           </GlassCard>
 
           {/* Actions Row */}
-          <div className="grid grid-cols-2 md:grid-cols-1 gap-6">
+          <div className="grid grid-cols-1 gap-6">
+
+            {mockRequests.length > 0 && (
+              <PendingRequestsWidget requests={mockRequests} />
+            )}
+
             {/* Quick Actions */}
             <div className="space-y-4">
               <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider px-1">Accès Rapide</h2>
               <div className="grid grid-cols-2 gap-4">
                 <ActionButton icon={Send} label="Envoyer" href="/transfer" variant="accent" />
-                <ActionButton icon={Download} label="Recevoir" href="/receive" />
+                <ActionButton icon={HandCoins} label="Demander" href="/request" />
               </div>
             </div>
 
@@ -238,14 +302,11 @@ export default async function Home() {
                   <span className="text-xs font-medium text-slate-500 group-hover:text-indigo-600 transition-colors">Ajouter</span>
                 </Link>
 
-                {quickUsers.map((u, i) => (
-                  <Link key={i} href="/transfer" className="flex flex-col items-center gap-2 min-w-[64px] group">
-                    <div className={cn("h-16 w-16 rounded-2xl flex items-center justify-center font-bold text-xl shadow-sm group-hover:scale-105 group-hover:shadow-md transition-all", u.color)}>
-                      {u.avatar}
-                    </div>
-                    <span className="text-xs font-medium text-slate-600 dark:text-slate-300 group-hover:text-indigo-600 transition-colors">{u.name}</span>
-                  </Link>
-                ))}
+                {contacts && contacts.length > 0 ? (
+                  contacts.slice(0, 5).map((c, i) => (
+                    <ContactHomeItem key={i} contact={c as any} />
+                  ))
+                ) : null}
               </div>
             </div>
           </div>
@@ -261,9 +322,13 @@ export default async function Home() {
               </Link>
             </div>
 
-            <div className="flex flex-col gap-3 overflow-y-auto pr-1 flex-1 custom-scrollbar" style={{ maxHeight: '600px' }}>
-              {recentTransactions.length > 0 ? (
-                recentTransactions.map((t) => (
+            <style dangerouslySetInnerHTML={{__html: `
+              .no-scrollbar::-webkit-scrollbar { display: none; }
+              .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}} />
+            <div className="flex flex-col gap-3 overflow-y-auto pr-1 flex-1 no-scrollbar" style={{ maxHeight: '600px' }}>
+              {allTransactions.length > 0 ? (
+                allTransactions.map((t: any) => (
                   <TransactionItem key={t.id} transaction={t} />
                 ))
               ) : (

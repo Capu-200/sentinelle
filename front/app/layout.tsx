@@ -6,7 +6,7 @@ import { AppShell } from "@/components/layout/app-shell";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "PAYONE - Banking Reinvented",
+  title: "PAYON - Banking Reinvented",
   description: "Next-gen secure payment platform",
 };
 

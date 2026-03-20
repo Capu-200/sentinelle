@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useEffect } from 'react';
 import { useFormStatus } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { GlassCard } from '@/components/ui/glass-card';
 import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2 } from 'lucide-react';
 import Link from 'next/link';
@@ -10,6 +11,7 @@ import toast from 'react-hot-toast';
 
 const initialState = {
     error: '',
+    success: false,
 };
 
 function SubmitButton() {
@@ -34,6 +36,7 @@ function SubmitButton() {
 }
 
 export default function LoginPage() {
+    const router = useRouter();
     const [state, dispatch] = useActionState(loginAction, initialState);
     const [showPassword, setShowPassword] = useState(false);
 
@@ -41,7 +44,11 @@ export default function LoginPage() {
         if (state?.error) {
             toast.error(state.error);
         }
-    }, [state]);
+        if (state?.success) {
+            toast.success('Connexion réussie !');
+            setTimeout(() => router.push('/'), 100);
+        }
+    }, [state, router]);
 
     return (
         <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
@@ -53,7 +60,7 @@ export default function LoginPage() {
             <div className="w-full max-w-md">
                 <div className="text-center mb-8">
                     <h1 className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 mb-2">
-                        Sentinelle
+                        Payon
                     </h1>
                     <p className="text-slate-600 dark:text-slate-400">
                         Sécurisez vos transactions en temps réel
@@ -94,6 +101,14 @@ export default function LoginPage() {
                                 >
                                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                                 </button>
+                            </div>
+                            <div className="flex justify-end px-1">
+                                <Link
+                                    href="/login/forgot-password"
+                                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 hover:underline transition-colors"
+                                >
+                                    Mot de passe oublié ?
+                                </Link>
                             </div>
                         </div>
 

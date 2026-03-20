@@ -13,4 +13,8 @@ export interface Transaction {
     status: TransactionStatus;
     date: string; // ISO string
     direction?: 'INCOMING' | 'OUTGOING';
+    sourceCountry?: string; // Code pays ISO (ex: "FR")
+    destinationCountry?: string; // Code pays ISO (ex: "ES")
+    comment?: string; // Commentaire utilisateur
+    recipientIban?: string; // IBAN du destinataire si disponible
 }

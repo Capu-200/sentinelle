@@ -26,7 +26,7 @@ from src.scoring.scorer import GlobalScorer
 
 # Initialiser l'application
 app = FastAPI(
-    title="Sentinelle ML Engine",
+    title="Payon ML Engine",
     description="Moteur de scoring ML pour la détection de fraude",
     version="1.0.0",
 )

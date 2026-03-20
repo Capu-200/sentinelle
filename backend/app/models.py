@@ -15,13 +15,13 @@ class UserBase(SQLModel):
     trust_score: Optional[int] = Field(default=100)
 
 class WalletBase(SQLModel):
-    currency: str = Field(default="EUR")
+    currency: str = Field(default="PYC")
     balance: Decimal = Field(default=0.0, max_digits=15, decimal_places=2)
     kyc_status: str = Field(default="PENDING")
 
 class TransactionBase(SQLModel):
     amount: Decimal = Field(default=0.0, max_digits=15, decimal_places=2)
-    currency: str = Field(default="EUR")
+    currency: str = Field(default="PYC")
     status: str = Field(default="PENDING") # Maps to kyc_status or internal status
     created_at: datetime = Field(default_factory=datetime.utcnow)
     recipient_name: Optional[str] = None # Helper for display
@@ -110,4 +110,17 @@ class HumanReview(SQLModel, table=True):
     label: Optional[str] = None
     comment: Optional[str] = None # TEXT
     final_status: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class Contact(SQLModel, table=True):
+    __tablename__ = "contacts"
+    
+    contact_id: Optional[str] = Field(default=None, primary_key=True)
+    user_id: str = Field(foreign_key="users.user_id") # Owner of the contact
+    
+    name: str
+    email: Optional[str] = None
+    iban: Optional[str] = None
+    
+    linked_user_id: Optional[str] = Field(default=None, foreign_key="users.user_id") # If internal user
     created_at: datetime = Field(default_factory=datetime.utcnow)
