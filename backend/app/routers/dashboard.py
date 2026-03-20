@@ -4,8 +4,9 @@ from typing import List
 
 from ..database import get_db
 from ..models import User, Wallet, Transaction
-from ..auth import get_current_user
+from ..auth import require_active_user
 from ..schemas import DashboardData, UserProfileResponse, WalletResponse, TransactionResponseLite
+from ..services.statuses import map_kyc_status_to_public
 
 router = APIRouter(
     prefix="/dashboard",
@@ -14,7 +15,7 @@ router = APIRouter(
 
 @router.get("/", response_model=DashboardData)
 def get_dashboard_summary(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_active_user),
     db: Session = Depends(get_db)
 ):
     # 1. Get Wallet
@@ -64,7 +65,7 @@ def get_dashboard_summary(
                 currency=tx.currency,
                 transaction_type=tx.transaction_type,
                 direction=direction,
-                status=tx.kyc_status,
+                status=map_kyc_status_to_public(tx.kyc_status),
                 recipient_name=tx.description or "Unknown Data",
                 created_at=tx.created_at
             )
