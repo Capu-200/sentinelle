@@ -1,12 +1,13 @@
 'use client';
 
-import { useActionState, useState, Suspense } from 'react';
+import { useActionState, useEffect, useState, Suspense } from 'react';
 import { useFormStatus } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { GlassCard } from '@/components/ui/glass-card';
-import { Eye, EyeOff, Lock, Mail, ArrowLeft, Loader2, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2, ArrowLeft, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { resetPasswordAction, AuthActionState } from '@/app/actions/auth';
+import toast from 'react-hot-toast';
 
 const initialState: AuthActionState = { error: '', success: false, message: '' };
 
@@ -16,82 +17,98 @@ function SubmitButton() {
         <button
             type="submit"
             disabled={pending}
-            className="group flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 py-4 font-bold text-white shadow-xl shadow-indigo-500/20 transition-all active:scale-95 disabled:opacity-70"
+            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold shadow-lg shadow-indigo-500/25 active:scale-[0.98] transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
         >
-            {pending ? <Loader2 className="h-5 w-5 animate-spin" /> : <span>Mettre à jour le mot de passe</span>}
+            {pending ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+                <>
+                    Changer le mot de passe
+                    <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </>
+            )}
         </button>
     );
 }
 
+// Inner component that uses useSearchParams — must be wrapped in Suspense
 function ResetPasswordForm() {
     const searchParams = useSearchParams();
     const prefillEmail = searchParams.get('email') || '';
     const router = useRouter();
     const [state, dispatch] = useActionState(resetPasswordAction, initialState);
-    const [showPwd, setShowPwd] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
-    if (state.success) {
-        setTimeout(() => router.push('/login'), 3000);
-    }
+    useEffect(() => {
+        if (state?.error) toast.error(state.error);
+        if (state?.success) {
+            toast.success(state.message || 'Succès !');
+            setTimeout(() => router.push('/login'), 2000);
+        }
+    }, [state, router]);
 
     return (
-        <GlassCard className="p-8 space-y-6">
-            <div>
-                <h1 className="text-2xl font-black text-white">Nouveau mot de passe</h1>
-                <p className="text-slate-400 text-sm mt-1">Choisissez un mot de passe sécurisé (6 caractères minimum).</p>
-            </div>
-
+        <GlassCard className="p-8 backdrop-blur-xl border-white/20 dark:border-white/10 shadow-2xl">
             {state.success ? (
-                <div className="flex flex-col items-center gap-4 py-6 text-center">
+                <div className="flex flex-col items-center gap-4 py-4 text-center">
                     <div className="h-16 w-16 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
                         <CheckCircle className="h-8 w-8 text-emerald-400" />
                     </div>
                     <div>
-                        <p className="font-bold text-white">{state.message}</p>
-                        <p className="text-slate-400 text-sm mt-1">Redirection automatique vers la connexion...</p>
+                        <p className="font-bold text-slate-900 dark:text-white">{state.message}</p>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Redirection automatique...</p>
                     </div>
                 </div>
             ) : (
-                <form action={dispatch} className="space-y-4">
-                    <div className="relative">
-                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-                        <input
-                            name="email"
-                            type="email"
-                            required
-                            defaultValue={prefillEmail}
-                            placeholder="votre@email.com"
-                            className="w-full rounded-xl bg-slate-800/60 pl-12 pr-4 py-4 text-white placeholder:text-slate-500 outline-none ring-1 ring-slate-700 focus:ring-indigo-500 transition-all"
-                        />
+                <form action={dispatch} className="space-y-6">
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold ml-1 text-slate-700 dark:text-slate-300">Email du compte</label>
+                        <div className="relative group">
+                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                            <input
+                                name="email"
+                                type="email"
+                                required
+                                defaultValue={prefillEmail}
+                                placeholder="jacques@payon.app"
+                                className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium placeholder:text-slate-400 text-slate-900 dark:text-white"
+                            />
+                        </div>
                     </div>
 
-                    <div className="relative">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-                        <input
-                            name="password"
-                            type={showPwd ? 'text' : 'password'}
-                            required
-                            placeholder="Nouveau mot de passe"
-                            className="w-full rounded-xl bg-slate-800/60 pl-12 pr-12 py-4 text-white placeholder:text-slate-500 outline-none ring-1 ring-slate-700 focus:ring-indigo-500 transition-all"
-                        />
-                        <button type="button" onClick={() => setShowPwd(!showPwd)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors">
-                            {showPwd ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                        </button>
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold ml-1 text-slate-700 dark:text-slate-300">Nouveau mot de passe</label>
+                        <div className="relative group">
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                            <input
+                                name="password"
+                                type={showPassword ? 'text' : 'password'}
+                                required
+                                placeholder="••••••••"
+                                className="w-full pl-12 pr-12 py-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium placeholder:text-slate-400 text-slate-900 dark:text-white"
+                            />
+                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="relative">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-                        <input
-                            name="confirm"
-                            type={showPwd ? 'text' : 'password'}
-                            required
-                            placeholder="Confirmer le mot de passe"
-                            className="w-full rounded-xl bg-slate-800/60 pl-12 pr-4 py-4 text-white placeholder:text-slate-500 outline-none ring-1 ring-slate-700 focus:ring-indigo-500 transition-all"
-                        />
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold ml-1 text-slate-700 dark:text-slate-300">Confirmer le mot de passe</label>
+                        <div className="relative group">
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                            <input
+                                name="confirm"
+                                type={showPassword ? 'text' : 'password'}
+                                required
+                                placeholder="••••••••"
+                                className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium placeholder:text-slate-400 text-slate-900 dark:text-white"
+                            />
+                        </div>
                     </div>
 
                     {state.error && (
-                        <p className="text-sm text-red-400 bg-red-500/10 px-4 py-3 rounded-xl border border-red-500/20">
+                        <p className="p-3 text-red-500 text-xs font-semibold text-center bg-red-500/10 rounded-lg border border-red-500/20">
                             {state.error}
                         </p>
                     )}
@@ -105,12 +122,28 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
     return (
-        <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-gradient-to-br from-slate-950 to-indigo-950">
-            <div className="w-full max-w-md space-y-6">
-                <Link href="/login" className="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors">
-                    <ArrowLeft className="h-4 w-4" /> Retour à la connexion
-                </Link>
-                <Suspense fallback={<div className="h-64 rounded-3xl bg-slate-800/40 animate-pulse" />}>
+        <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+            <div className="absolute inset-0 bg-slate-50 dark:bg-slate-950 -z-20" />
+            <div className="absolute top-1/4 -left-20 w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px] -z-10" />
+            <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-purple-500/20 rounded-full blur-[100px] -z-10" />
+
+            <div className="w-full max-w-md">
+                <div className="mb-6">
+                    <Link href="/login" className="inline-flex items-center gap-2 text-slate-500 hover:text-indigo-600 transition-colors font-medium text-sm group">
+                        <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
+                        Retour à la connexion
+                    </Link>
+                </div>
+
+                <div className="text-center mb-8">
+                    <h1 className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 mb-2">
+                        Réinitialisation
+                    </h1>
+                    <p className="text-slate-600 dark:text-slate-400">Choisissez votre nouveau mot de passe</p>
+                </div>
+
+                {/* Suspense is required because useSearchParams is used inside */}
+                <Suspense fallback={<div className="h-64 rounded-3xl bg-slate-200/40 dark:bg-slate-800/40 animate-pulse" />}>
                     <ResetPasswordForm />
                 </Suspense>
             </div>

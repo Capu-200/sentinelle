@@ -19,7 +19,7 @@ const LoginSchema = z.object({
 
 export async function registerAction(prevState: any, formData: FormData) {
     const data = {
-        full_name: formData.get("name"), // form field is 'name' but we map to full_name for validation/backend
+        full_name: formData.get("name"),
         email: formData.get("email"),
         password: formData.get("password"),
     };
@@ -38,7 +38,6 @@ export async function registerAction(prevState: any, formData: FormData) {
 
         if (!res.ok) {
             const errorData = await res.json();
-            // Handle FastAPI validation error array
             if (Array.isArray(errorData.detail)) {
                 const messages = errorData.detail.map((err: any) =>
                     `${err.loc[1] || 'Champ'}: ${err.msg}`
@@ -62,9 +61,7 @@ export async function registerAction(prevState: any, formData: FormData) {
             path: "/",
         });
     } catch (err) {
-        if ((err as Error).message === "NEXT_REDIRECT") {
-            throw err;
-        }
+        if ((err as Error).message === "NEXT_REDIRECT") throw err;
         console.error("Register Error:", err);
         return { error: "Erreur de connexion au serveur", success: false };
     }
@@ -104,9 +101,7 @@ export async function loginAction(prevState: any, formData: FormData) {
         const { access_token } = await res.json();
         const cookieStore = await cookies();
 
-        // On Vercel (and any HTTPS host), cookies must be secure=true.
-        // We use VERCEL env var (automatically set by Vercel) as the most reliable signal.
-        // NODE_ENV is not reliable because Next.js runs in production mode even on preview branches.
+        // VERCEL=1 is automatically injected by Vercel — more reliable than NODE_ENV
         const isSecureContext = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
         console.log(`[LOGIN] Setting cookie - SecureContext: ${isSecureContext}, VERCEL: ${process.env.VERCEL}`);
 
@@ -118,9 +113,7 @@ export async function loginAction(prevState: any, formData: FormData) {
             path: "/",
         });
     } catch (err) {
-        if ((err as Error).message === "NEXT_REDIRECT") {
-            throw err;
-        }
+        if ((err as Error).message === "NEXT_REDIRECT") throw err;
         console.error("Login Error:", err);
         return { error: "Erreur de connexion au serveur", success: false };
     }
@@ -134,7 +127,7 @@ export async function logoutAction() {
     redirect("/login");
 }
 
-// Unified state type — avoids useActionState overload TS error on Vercel
+// Unified state type — required to avoid useActionState overload TS error on Vercel
 export type AuthActionState = { error: string; success: boolean; message: string };
 
 export async function forgotPasswordAction(
@@ -193,7 +186,8 @@ export async function resetPasswordAction(
         });
 
         if (!res.ok) {
-            return { error: "Erreur lors de la réinitialisation.", success: false, message: "" };
+            const errorData = await res.json().catch(() => ({}));
+            return { error: errorData.detail || "Erreur lors de la réinitialisation.", success: false, message: "" };
         }
 
         return { success: true, error: "", message: "Mot de passe mis à jour avec succès !" };
