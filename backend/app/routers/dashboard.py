@@ -4,9 +4,10 @@ from typing import List, Optional
 from pydantic import BaseModel # Added for DashboardData definition
 
 from ..database import get_db
-from ..models import User, Wallet, Transaction, Contact # Added Contact
-from ..auth import get_current_user
-from ..schemas import UserProfileResponse, WalletResponse, TransactionResponseLite # Removed DashboardData, as it's redefined below
+from ..models import User, Wallet, Transaction, Contact
+from ..auth import require_active_user, get_current_user
+from ..schemas import DashboardData, UserProfileResponse, WalletResponse, TransactionResponseLite
+from ..services.statuses import map_kyc_status_to_public
 
 router = APIRouter(
     prefix="/dashboard",
@@ -21,6 +22,8 @@ class DashboardData(BaseModel):
     contacts: List[dict] # Added field
 
 @router.get("/", response_model=DashboardData)
+def get_dashboard_summary(
+    current_user: User = Depends(require_active_user),
 async def get_dashboard_summary( # Added async
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -80,6 +83,8 @@ async def get_dashboard_summary( # Added async
                 currency=tx.currency,
                 transaction_type=tx.transaction_type,
                 direction=direction,
+                status=map_kyc_status_to_public(tx.kyc_status),
+                recipient_name=tx.description or "Unknown Data",
                 status=tx.kyc_status,
                 recipient_name=display_name, # Updated to use display_name
                 created_at=tx.created_at
