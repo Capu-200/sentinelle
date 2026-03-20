@@ -13,13 +13,6 @@ export const Header = () => {
                     <ShieldCheck className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
                     <span>PayOn</span>
                 </div>
-                <div className="ml-auto">
-                    <Link href="/profile">
-                        <div className="h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center hover:ring-2 ring-indigo-500 transition-all">
-                            <User className="h-5 w-5 text-slate-500" />
-                        </div>
-                    </Link>
-                </div>
             </div>
         </header>
     );

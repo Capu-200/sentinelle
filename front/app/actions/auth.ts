@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { z } from "zod";
 
-const API_URL = process.env.API_URL || "https://sentinelle-api-backend-ntqku76mya-ew.a.run.app";
+// Bypass environment variables because Next.js has cached the local one
+const API_URL = "https://sentinelle-api-backend-ntqku76mya-ew.a.run.app";
 
 const RegisterSchema = z.object({
     full_name: z.string().min(2),
@@ -15,6 +16,15 @@ const RegisterSchema = z.object({
 const LoginSchema = z.object({
     email: z.string().email(),
     password: z.string().min(1),
+});
+
+const ForgotPasswordSchema = z.object({
+    email: z.string().email(),
+});
+
+const ResetPasswordSchema = z.object({
+    email: z.string().email(),
+    password: z.string().min(6),
 });
 
 export async function registerAction(prevState: any, formData: FormData) {
@@ -129,4 +139,66 @@ export async function logoutAction() {
     const cookieStore = await cookies();
     cookieStore.delete("auth-token");
     redirect("/login");
+}
+
+export async function forgotPasswordAction(prevState: any, formData: FormData) {
+    const data = {
+        email: formData.get("email"),
+    };
+
+    const validated = ForgotPasswordSchema.safeParse(data);
+    if (!validated.success) {
+        return { error: "Email invalide" };
+    }
+
+    try {
+        const res = await fetch(`${API_URL}/auth/forgot-password`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(validated.data),
+        });
+
+        if (!res.ok) {
+            const errorData = await res.json();
+            return { error: errorData.detail || "Erreur lors de la demande" };
+        }
+
+        return { success: true, message: "Un lien de réinitialisation a été envoyé (simulation)" };
+    } catch (err) {
+        console.error("Forgot Password Error:", err);
+        return { error: "Erreur de connexion au serveur" };
+    }
+}
+
+export async function resetPasswordAction(prevState: any, formData: FormData) {
+    const data = {
+        email: formData.get("email"),
+        password: formData.get("password"),
+    };
+
+    const validated = ResetPasswordSchema.safeParse(data);
+    if (!validated.success) {
+        return { error: "Données invalides (mot de passe 6 caractères min)" };
+    }
+
+    try {
+        const res = await fetch(`${API_URL}/auth/reset-password`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                email: validated.data.email,
+                new_password: validated.data.password
+            }),
+        });
+
+        if (!res.ok) {
+            const errorData = await res.json();
+            return { error: errorData.detail || "Erreur lors de la réinitialisation" };
+        }
+
+        return { success: true, message: "Mot de passe modifié avec succès" };
+    } catch (err) {
+        console.error("Reset Password Error:", err);
+        return { error: "Erreur de connexion au serveur" };
+    }
 }
