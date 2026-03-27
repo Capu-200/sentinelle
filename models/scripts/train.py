@@ -18,6 +18,7 @@ import os
 import pickle
 import sys
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 from sklearn.metrics import accuracy_score, average_precision_score, f1_score
@@ -58,6 +59,134 @@ def _convert_features_to_numeric(df: pd.DataFrame) -> pd.DataFrame:
             df_converted[col] = pd.to_numeric(df_converted[col], errors='coerce').fillna(0.0)
     
     return df_converted
+
+
+def _safe_float(value: Any) -> float | None:
+    """Convertit proprement une valeur pandas/scalaire en float."""
+    if value is None or pd.isna(value):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _log_dataset_context(*, mlflow, paysim_train, paysim_val, paysim_test, payon_train, payon_val, payon_test) -> None:
+    """Log le contexte dataset pour rendre les runs comparables dans MLflow."""
+    mlflow.log_metrics(
+        {
+            "paysim_train_rows": float(len(paysim_train)),
+            "paysim_val_rows": float(len(paysim_val)),
+            "paysim_test_rows": float(len(paysim_test)),
+            "payon_train_rows": float(len(payon_train)),
+            "payon_val_rows": float(len(payon_val)),
+            "payon_test_rows": float(len(payon_test)),
+            "paysim_train_fraud_rate": float(paysim_train["is_fraud"].mean()) if "is_fraud" in paysim_train.columns else 0.0,
+            "paysim_val_fraud_rate": float(paysim_val["is_fraud"].mean()) if "is_fraud" in paysim_val.columns else 0.0,
+            "paysim_test_fraud_rate": float(paysim_test["is_fraud"].mean()) if "is_fraud" in paysim_test.columns else 0.0,
+        }
+    )
+    mlflow.log_params(
+        {
+            "paysim_train_period_start": str(paysim_train["created_at"].min()),
+            "paysim_train_period_end": str(paysim_train["created_at"].max()),
+            "paysim_val_period_start": str(paysim_val["created_at"].min()),
+            "paysim_val_period_end": str(paysim_val["created_at"].max()),
+            "payon_train_period_start": str(payon_train["created_at"].min()),
+            "payon_train_period_end": str(payon_train["created_at"].max()),
+            "payon_val_period_start": str(payon_val["created_at"].min()),
+            "payon_val_period_end": str(payon_val["created_at"].max()),
+        }
+    )
+
+
+def _find_previous_comparable_run(*, mlflow, experiment_id: str, current_run_id: str, current_run_type: str):
+    """Retourne le run précédent le plus récent avec des métriques comparables."""
+    runs_df = mlflow.search_runs(
+        experiment_ids=[experiment_id],
+        order_by=["attributes.start_time DESC"],
+        max_results=50,
+    )
+    if runs_df.empty:
+        return None
+
+    for _, run in runs_df.iterrows():
+        run_id = run.get("run_id") or run.get("info.run_id")
+        if run_id == current_run_id:
+            continue
+
+        previous_run_type = run.get("tags.run_type")
+        if current_run_type == "full" and previous_run_type == "test":
+            continue
+
+        if _safe_float(run.get("metrics.val_pr_auc")) is None and _safe_float(run.get("metrics.val_f1")) is None:
+            continue
+
+        return run
+
+    return None
+
+
+def _compute_deployment_recommendation(
+    *,
+    run_type: str,
+    val_pr_auc: float | None,
+    val_f1: float | None,
+    block_threshold: float,
+    review_threshold: float,
+    artifacts_present: bool,
+    previous_run,
+) -> dict[str, Any]:
+    """Produit une recommandation simple de déploiement pour la lecture MLflow."""
+    recommendation = "manual_review_required"
+    candidate_for_deploy = False
+    thresholds_ok = block_threshold > review_threshold > 0
+
+    if run_type != "full":
+        recommendation = "do_not_deploy_test_run"
+    elif not artifacts_present or not thresholds_ok:
+        recommendation = "do_not_deploy_incomplete_run"
+    elif val_pr_auc is None or val_f1 is None:
+        recommendation = "manual_review_missing_metrics"
+    elif previous_run is None:
+        recommendation = "manual_review_no_previous_baseline"
+    else:
+        prev_pr_auc = _safe_float(previous_run.get("metrics.val_pr_auc"))
+        prev_f1 = _safe_float(previous_run.get("metrics.val_f1"))
+        if prev_pr_auc is None or prev_f1 is None:
+            recommendation = "manual_review_previous_metrics_missing"
+        elif val_pr_auc > prev_pr_auc and val_f1 >= prev_f1:
+            recommendation = "deploy_candidate_better_than_previous"
+            candidate_for_deploy = True
+        elif val_pr_auc >= prev_pr_auc and val_f1 > prev_f1:
+            recommendation = "deploy_candidate_better_than_previous"
+            candidate_for_deploy = True
+        elif val_pr_auc < prev_pr_auc and val_f1 < prev_f1:
+            recommendation = "keep_previous_version"
+        else:
+            recommendation = "manual_review_mixed_metrics"
+
+    previous_run_id = None
+    previous_version = None
+    previous_val_pr_auc = None
+    previous_val_f1 = None
+    if previous_run is not None:
+        previous_run_id = previous_run.get("run_id") or previous_run.get("info.run_id")
+        previous_version = previous_run.get("params.version")
+        previous_val_pr_auc = _safe_float(previous_run.get("metrics.val_pr_auc"))
+        previous_val_f1 = _safe_float(previous_run.get("metrics.val_f1"))
+
+    return {
+        "recommendation": recommendation,
+        "candidate_for_deploy": candidate_for_deploy,
+        "thresholds_ok": thresholds_ok,
+        "previous_run_id": previous_run_id,
+        "previous_version": previous_version,
+        "previous_val_pr_auc": previous_val_pr_auc,
+        "previous_val_f1": previous_val_f1,
+        "delta_val_pr_auc": (val_pr_auc - previous_val_pr_auc) if val_pr_auc is not None and previous_val_pr_auc is not None else None,
+        "delta_val_f1": (val_f1 - previous_val_f1) if val_f1 is not None and previous_val_f1 is not None else None,
+    }
 
 
 def main():
@@ -111,13 +240,27 @@ def main():
 
     args = parser.parse_args()
 
+    # Plan MLflow v1 :
+    # 1) distinguer run complet vs run test
+    # 2) logger le contexte dataset pour rendre les runs comparables
+    # 3) comparer automatiquement au run précédent exploitable
+    # 4) produire une recommandation simple de déploiement
+    run_type = "test" if args.test_size is not None else "full"
+    training_mode = "local" if args.local else "cloud"
+    run_name = f"train-v{args.version}" if run_type == "full" else f"train-v{args.version}-test-{args.test_size}"
+
+    mlflow = None
+    mlflow_experiment = None
+    mlflow_run = None
+
     # MLflow : activé si MLFLOW_EXPERIMENT_NAME ou MLFLOW_TRACKING_URI est défini
     use_mlflow = bool(os.getenv("MLFLOW_EXPERIMENT_NAME") or os.getenv("MLFLOW_TRACKING_URI"))
     if use_mlflow:
         import mlflow
         exp_name = os.getenv("MLFLOW_EXPERIMENT_NAME", "/Shared/Sentinelle Production")
         mlflow.set_experiment(exp_name)
-        mlflow.start_run(run_name=f"train-v{args.version}")
+        mlflow_experiment = mlflow.get_experiment_by_name(exp_name)
+        mlflow_run = mlflow.start_run(run_name=run_name)
         mlflow.log_params({
             "version": args.version,
             "local": str(args.local),
@@ -127,6 +270,17 @@ def main():
         })
         if args.test_size:
             mlflow.log_param("test_size", args.test_size)
+        mlflow.set_tags(
+            {
+                "project": "sentinelle",
+                "run_type": run_type,
+                "training_mode": training_mode,
+                "dataset": "PaySim+Payon",
+                "model_family": "hybrid_supervised_unsupervised",
+                "deployment_recommendation": "pending",
+                "candidate_for_deploy": "false",
+            }
+        )
         print(f"📊 MLflow: run démarré (experiment: {exp_name})")
 
     print(f"🚀 Démarrage de l'entraînement (version {args.version})")
@@ -190,6 +344,17 @@ def main():
         val_ratio=0.15,
         test_ratio=0.15,
     )
+
+    if use_mlflow:
+        _log_dataset_context(
+            mlflow=mlflow,
+            paysim_train=paysim_train,
+            paysim_val=paysim_val,
+            paysim_test=paysim_test,
+            payon_train=payon_train,
+            payon_val=payon_val,
+            payon_test=payon_test,
+        )
     
     # ========== 2. FEATURE ENGINEERING ==========
     print("\n" + "=" * 60)
@@ -472,6 +637,66 @@ def main():
         except Exception as e:
             print(f"⚠️  Export baseline GCS ignoré: {e}")
 
+    recommendation = None
+    if use_mlflow:
+        mlflow.log_metric("feature_count", float(len(feature_schema["features"])))
+
+        artifacts_present = all(path.exists() for path in (schema_path, thresholds_path, unsupervised_path))
+        if supervised_model:
+            artifacts_present = artifacts_present and supervised_path.exists()
+
+        current_val_pr_auc = None
+        current_val_f1 = None
+        if supervised_scores is not None and paysim_val_labels is not None:
+            val_pred_binary = (supervised_scores >= 0.5).astype(int)
+            current_val_f1 = float(f1_score(paysim_val_labels, val_pred_binary, zero_division=0))
+            current_val_pr_auc = float(average_precision_score(paysim_val_labels, supervised_scores))
+
+        previous_run = None
+        if mlflow_experiment is not None and mlflow_run is not None:
+            previous_run = _find_previous_comparable_run(
+                mlflow=mlflow,
+                experiment_id=mlflow_experiment.experiment_id,
+                current_run_id=mlflow_run.info.run_id,
+                current_run_type=run_type,
+            )
+
+        recommendation = _compute_deployment_recommendation(
+            run_type=run_type,
+            val_pr_auc=current_val_pr_auc,
+            val_f1=current_val_f1,
+            block_threshold=float(block_threshold),
+            review_threshold=float(review_threshold),
+            artifacts_present=artifacts_present,
+            previous_run=previous_run,
+        )
+
+        comparison_metrics = {
+            "threshold_gap": float(block_threshold - review_threshold),
+        }
+        if recommendation["previous_val_pr_auc"] is not None:
+            comparison_metrics["previous_val_pr_auc"] = recommendation["previous_val_pr_auc"]
+        if recommendation["previous_val_f1"] is not None:
+            comparison_metrics["previous_val_f1"] = recommendation["previous_val_f1"]
+        if recommendation["delta_val_pr_auc"] is not None:
+            comparison_metrics["delta_val_pr_auc"] = recommendation["delta_val_pr_auc"]
+        if recommendation["delta_val_f1"] is not None:
+            comparison_metrics["delta_val_f1"] = recommendation["delta_val_f1"]
+        mlflow.log_metrics(comparison_metrics)
+        mlflow.set_tags(
+            {
+                "compare_ready": "true" if run_type == "full" else "false",
+                "artifacts_present": str(artifacts_present).lower(),
+                "thresholds_ok": str(recommendation["thresholds_ok"]).lower(),
+                "candidate_for_deploy": str(recommendation["candidate_for_deploy"]).lower(),
+                "deployment_recommendation": recommendation["recommendation"],
+            }
+        )
+        if recommendation["previous_run_id"]:
+            mlflow.set_tag("compared_to_run_id", recommendation["previous_run_id"])
+        if recommendation["previous_version"]:
+            mlflow.set_tag("compared_to_version", recommendation["previous_version"])
+
     # ========== RÉSUMÉ ==========
     print("\n" + "=" * 60)
     print("✅ ENTRAÎNEMENT TERMINÉ")
@@ -489,6 +714,8 @@ def main():
     if use_mlflow:
         import mlflow
         mlflow.end_run()
+        if recommendation is not None:
+            print(f"📊 MLflow: recommandation = {recommendation['recommendation']}")
         print(f"📊 MLflow: run terminé")
 
 

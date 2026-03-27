@@ -1,220 +1,408 @@
-# 📊 Monitoring ML – Vertex AI Model Monitoring (GCS) + MLflow (training)
+# 📊 MLflow pour comparer les entraînements
 
-Monitoring en production via **Vertex AI Model Monitoring** alimenté par les logs d’inférence écrits en **GCS** (`monitoring/inference_logs/`).
-**MLflow** est utilisé pour l’entraînement (métriques + artefacts) et le versioning des modèles.
-
----
-
-## 🎯 Objectif
-
-Centraliser le suivi des performances des modèles ML via **MLflow (entraînement)** et **Vertex AI Model Monitoring (inférence)** pour :
-
-1. **Entraînement** : visualiser les métriques de chaque run (accuracy, F1, PR-AUC, seuils)
-2. **Inférence** : suivre le drift des données et des prédictions en production (Vertex AI à partir des logs GCS)
-3. **Comparaison** : comparer les runs entre versions (ex. v1.0.0 vs v2.0.0)
-4. **Traçabilité** : garder un historique des entraînements et des artefacts
+> ✅ **Statut : Opérationnel**  
+> **MLflow** sert à comparer les runs d'entraînement et à décider si une nouvelle version mérite un déploiement.  
+> **Vertex AI** reste l'outil de monitoring de production (drift sur vraies inférences).
 
 ---
 
-## 🔗 Intégration
+## 🎯 Objectif réel
 
-### Flux actuel
+Le besoin principal de MLflow dans ce projet est simple :
 
+**répondre à la question "est-ce que la version `V+1` est meilleure que la version `V` avant déploiement ?"**
+
+MLflow doit donc permettre de :
+1. visualiser les métriques d'entraînement de chaque version
+2. comparer facilement deux runs dans l'UI
+3. retrouver les seuils et artefacts utilisés
+4. décider rapidement si une version est candidate au déploiement
+
+---
+
+## ✅ Répartition des rôles
+
+### MLflow = comparaison des entraînements
+
+MLflow sert à comparer :
+- les métriques de validation
+- les paramètres d'entraînement
+- les seuils finaux
+- les artefacts associés à une version
+
+### Vertex AI = monitoring en production
+
+Vertex AI sert à surveiller :
+- le drift des données d'entrée
+- le drift des sorties du modèle
+- le comportement du modèle sur les vraies transactions
+
+### Règle simple
+
+- **Avant déploiement** : regarder **MLflow**
+- **Après déploiement** : regarder **Vertex AI**
+
+---
+
+## 🧭 Organisation recommandée
+
+### Recommandation simple
+
+Pour ton besoin, le plus simple est d'utiliser **un seul experiment MLflow principal** :
+
+`/Shared/Sentinelle Production`
+
+Pourquoi :
+- toutes les versions candidates sont au même endroit
+- la comparaison entre deux runs est plus simple
+- l'usage est plus opérationnel
+
+### Convention recommandée
+
+- **1 run MLflow = 1 version entraînée**
+- **1 run_name = `train-v<version>`**
+
+Exemple :
+- `train-v2.0.0`
+- `train-v2.0.1-mlflow`
+
+---
+
+## 🔗 Flux cible
+
+```text
+Entraînement -> MLflow -> comparaison -> décision de déploiement
+Déploiement -> Production -> Vertex AI -> drift en production
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        FLUX D'ENTRAÎNEMENT                                  │
-└─────────────────────────────────────────────────────────────────────────────┘
 
-  Google Cloud Console                    Databricks MLflow
-  (Cloud Run Jobs)                              │
-         │                                      │
-         │ 1. Lancement job                     │
-         │    sentinelle-training               │
-         ▼                                      │
-  ┌──────────────────┐                         │
-  │ train.py         │                         │
-  │ - Préparation    │                         │
-  │ - Features       │                         │
-  │ - LightGBM       │                         │
-  │ - IsolationForest│                         │
-  │ - Seuils         │                         │
-  │ - Artefacts → GCS│                         │
-  └────────┬─────────┘                         │
-           │                                   │
-           │ 2. Transposition / sync            │
-           │    (manuel ou script)              │
-           └──────────────────────────────────►│
-                                               │
-                                    ┌──────────▼──────────┐
-                                    │ MLflow Experiments   │
-                                    │ - Sentinelle Prod    │
-                                    │ - Sentinelle Test    │
-                                    │ - Sentinelle Payon   │
-                                    └─────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        FLUX D'INFÉRENCE                                     │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-  ML Engine (Cloud Run)  ──►  GCS (inference_logs)  ──►  Vertex AI Model Monitoring (drift)
-```
-
-### Plateforme cible
-
-| Composant | Plateforme |
-|-----------|------------|
-| **Entraînement** | Google Cloud Run Jobs |
-| **Scoring** | Google Cloud Run (ML Engine) |
-| **Monitoring centralisé** | **Vertex AI Model Monitoring** |
-| **Vertex AI** | ✅ Opérationnel (drift via baseline + inference logs) |
+Concrètement :
+1. entraîner une nouvelle version
+2. logger automatiquement le run dans MLflow
+3. comparer cette version à la précédente
+4. décider si elle mérite le déploiement
+5. une fois déployée, surveiller la prod avec Vertex
 
 ---
 
-## ✅ Développement déjà réalisé
+## 🗺️ Plan MLflow retenu
 
-### 1. Entraînement MLflow (Databricks)
+Le plan retenu pour ce projet est volontairement simple.
 
-| Élément | Statut | Détail |
-|---------|--------|--------|
-| **Experiments** | ✅ Créés | Sentinelle Production, Sentinelle Test, Sentinelle Payon |
-| **Run exemple** | ✅ Réalisé | `train-v2.0.1-mlflow` (mars 2026) |
-| **Métriques loguées** | ✅ | val_accuracy, val_f1, val_pr_auc, block_threshold, review_threshold |
-| **Artefacts** | ✅ | baseline_train.jsonl, feature_schema.json, thresholds.json |
-| **Workspace** | ✅ | `https://dbc-576fb506-d185.cloud.databricks.com` |
+### Étape 1. Structurer les runs
 
-### 2. Entraînement (Google Cloud)
+Chaque run doit indiquer clairement :
+- si c'est un run **complet** ou un run **de test**
+- s'il est lancé en **local** ou en **cloud**
+- quelle version il entraîne
 
-| Élément | Statut | Fichier / Référence |
-|---------|--------|---------------------|
-| **train.py** | ✅ | `models/scripts/train.py` |
-| **Calibration seuils** | ✅ | block_threshold, review_threshold |
-| **Export baseline GCS** | ✅ | Si `EXPORT_BASELINE_GCS_BUCKET` défini |
-| **Artefacts GCS** | ✅ | `gs://sentinelle-485209-ml-data/artifacts/vX.X.X/` |
+### Étape 2. Rendre les runs comparables
 
-### 3. Inférence (ML Engine)
+Chaque run doit logger :
+- les métriques de validation
+- les tailles des datasets
+- les périodes temporelles utilisées
+- les seuils finaux
+- les artefacts essentiels
 
-| Élément | Statut | Fichier / Référence |
-|---------|--------|---------------------|
-| **Logging GCS** | ✅ | `models/src/monitoring/gcs_logger.py` |
-| **Variables Cloud Run** | ✅ | MONITORING_GCS_BUCKET, MONITORING_SAMPLE_RATE |
-| **Format JSONL** | ✅ | request_time, features, risk_score, decision, model_version |
+### Étape 3. Comparer automatiquement au run précédent
 
----
+Le code doit retrouver le run précédent exploitable dans le même experiment et calculer :
+- l'écart de `val_pr_auc`
+- l'écart de `val_f1`
 
-## 🚧 Développement à faire
+### Étape 4. Produire une recommandation simple
 
-### Priorité 1 : Intégration MLflow dans l'entraînement
-
-| Tâche | Description | Fichier concerné |
-|-------|-------------|------------------|
-| **1.1** | Ajouter `mlflow` au `requirements.txt` ou `pyproject.toml` | `models/` |
-| **1.2** | Instrumenter `train.py` avec `mlflow.log_metric()`, `mlflow.log_param()`, `mlflow.log_artifact()` | `models/scripts/train.py` |
-| **1.3** | Définir l’experiment MLflow (ex. `/Shared/Sentinelle Production`) | Variable d’env ou config |
-| **1.4** | Logger les métriques : val_accuracy, val_f1, val_pr_auc, block_threshold, review_threshold | `train.py` + `supervised/train.py` |
-| **1.5** | Logger les artefacts : feature_schema.json, thresholds.json, baseline_train.jsonl | `train.py` |
-
-### Priorité 2 : Monitoring inférence via Vertex AI Model Monitoring
-
-Le drift est calculé par **Vertex AI Model Monitoring** à partir de :
-- des logs d’inférence écrits par l’API dans `gs://sentinelle-485209-ml-data/monitoring/inference_logs/` (JSONL)
-- d’une baseline exportée depuis l’entraînement dans `gs://<bucket>/monitoring/baseline/<version>/train_features.jsonl` (si disponible)
-
-Procédure complète : voir `06_MONITORING_VERTEX.md`.
-
-### Priorité 4 : Comparaison des runs
-
-| Tâche | Description |
-|-------|-------------|
-| **4.1** | Documenter l’usage de "Compare" dans MLflow UI |
-| **4.2** | Définir des tags par version (ex. `version=2.0.0`, `env=production`) |
+Le run doit exposer une recommandation lisible dans MLflow, par exemple :
+- `deploy_candidate_better_than_previous`
+- `keep_previous_version`
+- `manual_review_mixed_metrics`
+- `do_not_deploy_test_run`
 
 ---
 
-## 📋 Métriques à suivre
+## ✅ Ce que le code log déjà dans MLflow
 
-### Entraînement (à logger dans MLflow)
+Le script `models/scripts/train.py` log déjà les éléments suivants.
 
-| Métrique | Description | Source |
-|----------|-------------|--------|
-| **val_accuracy** | Accuracy sur le validation set | Modèle supervisé |
-| **val_f1** | F1-score sur le validation set | Modèle supervisé |
-| **val_pr_auc** | Precision-Recall AUC | Modèle supervisé |
-| **block_threshold** | Seuil BLOCK (top 0.1–0.5 %) | Calibration |
-| **review_threshold** | Seuil REVIEW (top 1 %) | Calibration |
+### Paramètres
 
-### Paramètres à logger
-
-| Paramètre | Exemple |
-|-----------|---------|
-| version | 1.0.0-monitoring |
-| local | True |
-| data_dir | Data/processed |
-| config_dir | configs |
-| artifacts_dir | artifacts |
-
-### Inférence (Vertex AI Model Monitoring)
-
-Vertex AI calcule automatiquement :
-
-| Objectif | Description |
+| Paramètre | Description |
 |----------|-------------|
-| Input feature drift | Divergence des distributions des features |
-| Output drift | Divergence de `risk_score` et `decision` |
-| Alertes | Déclenchement selon les seuils configurés (numeric: Jensen–Shannon, categorical: L-infinity) |
+| `version` | version entraînée |
+| `local` | entraînement local ou non |
+| `data_dir` | dossier de données |
+| `config_dir` | dossier de configuration |
+| `artifacts_dir` | dossier de sortie des artefacts |
+| `test_size` | présent seulement en mode test |
+| `paysim_*_period_*` | périodes temporelles PaySim |
+| `payon_*_period_*` | périodes temporelles Payon |
+
+### Métriques
+
+| Métrique | Description |
+|----------|-------------|
+| `val_accuracy` | accuracy sur validation |
+| `val_f1` | F1-score sur validation |
+| `val_pr_auc` | PR-AUC sur validation |
+| `block_threshold` | seuil final BLOCK |
+| `review_threshold` | seuil final REVIEW |
+| `paysim_train_rows` | volume train PaySim |
+| `paysim_val_rows` | volume val PaySim |
+| `paysim_test_rows` | volume test PaySim |
+| `payon_train_rows` | volume train Payon |
+| `payon_val_rows` | volume val Payon |
+| `payon_test_rows` | volume test Payon |
+| `paysim_train_fraud_rate` | taux de fraude train |
+| `paysim_val_fraud_rate` | taux de fraude val |
+| `paysim_test_fraud_rate` | taux de fraude test |
+| `feature_count` | nombre de features finales |
+| `threshold_gap` | écart entre seuil BLOCK et REVIEW |
+| `previous_val_pr_auc` | PR-AUC du run précédent comparable |
+| `previous_val_f1` | F1 du run précédent comparable |
+| `delta_val_pr_auc` | delta PR-AUC vs run précédent |
+| `delta_val_f1` | delta F1 vs run précédent |
+
+### Tags
+
+| Tag | Description |
+|-----|-------------|
+| `run_type` | `full` ou `test` |
+| `training_mode` | `local` ou `cloud` |
+| `dataset` | dataset logique utilisé |
+| `model_family` | type de pipeline entraîné |
+| `compare_ready` | run exploitable pour comparaison ou non |
+| `artifacts_present` | artefacts essentiels présents |
+| `thresholds_ok` | seuils cohérents ou non |
+| `candidate_for_deploy` | `true` / `false` |
+| `deployment_recommendation` | recommandation finale |
+| `compared_to_run_id` | run précédent utilisé comme baseline |
+| `compared_to_version` | version précédente comparée |
+
+### Artefacts
+
+| Artefact | Description |
+|----------|-------------|
+| `feature_schema.json` | schéma des features |
+| `thresholds.json` | seuils finaux |
+| `baseline_train.jsonl` | baseline training exportée pour comparaison / Vertex |
 
 ---
 
-## 📁 Structure des experiments Databricks
+## 📌 Ce qu'il faut regarder dans MLflow
 
-| Experiment | Usage |
-|------------|-------|
-| **Sentinelle Production** | Runs de modèles déployés en prod |
-| **Sentinelle Test** | Runs de validation / tests |
-| **Sentinelle Payon** | Runs POC / développement |
+Si ton objectif est de **choisir la meilleure version**, alors regarde en priorité :
+
+1. **`val_pr_auc`**
+   - métrique la plus utile si le dataset est déséquilibré
+   - c'est la métrique principale à utiliser pour arbitrer
+
+2. **`val_f1`**
+   - utile pour voir l'équilibre précision / rappel
+   - bonne métrique secondaire de décision
+
+3. **`val_accuracy`**
+   - à regarder, mais moins décisive si la fraude est rare
+
+4. **`block_threshold` et `review_threshold`**
+   - permettent de voir si la calibration finale reste cohérente
+   - utile pour vérifier qu'une version n'introduit pas des seuils absurdes
+
+5. **les artefacts**
+   - pour vérifier que le run a bien produit un `feature_schema.json`, `thresholds.json` et une baseline
+
+6. **`deployment_recommendation`**
+   - c'est le résumé le plus rapide à lire
+   - il permet de savoir si le run semble meilleur, moins bon ou ambigu
+
+7. **`candidate_for_deploy`**
+   - utile pour filtrer rapidement les runs intéressants
 
 ---
 
-## 🔧 Configuration
+## ✅ Règle de décision simple avant déploiement
 
-### Variables d'environnement (entraînement)
+Voici une règle opérationnelle simple.
+
+Une nouvelle version `V+1` mérite d'être déployée si :
+
+1. `val_pr_auc` est meilleure ou au moins aussi bonne que la version précédente
+2. `val_f1` ne se dégrade pas de manière significative
+3. les seuils `block_threshold` / `review_threshold` restent cohérents
+4. les artefacts sont bien présents
+5. le run n'est pas un run de test réduit (`test_size`) si l'objectif est un vrai déploiement
+
+### En pratique
+
+**On privilégie `val_pr_auc` puis `val_f1`.**
+
+Si une nouvelle version a :
+- une meilleure `val_pr_auc`
+- un `val_f1` stable ou meilleur
+- des seuils cohérents
+
+alors elle devient une **candidate au déploiement**.
+
+### Traduction dans le code
+
+La logique actuelle dans `train.py` est :
+
+- si le run est un `test` -> `do_not_deploy_test_run`
+- si les artefacts ou seuils sont incohérents -> `do_not_deploy_incomplete_run`
+- si aucun run précédent comparable n'existe -> `manual_review_no_previous_baseline`
+- si `val_pr_auc` et `val_f1` sont meilleurs que le run précédent -> `deploy_candidate_better_than_previous`
+- si les deux sont moins bons -> `keep_previous_version`
+- sinon -> `manual_review_mixed_metrics`
+
+---
+
+## 🚫 Ce qu'il ne faut pas comparer directement
+
+Pour éviter de mauvaises conclusions, ne compare pas dans la même décision :
+
+- un run complet vs un run `test_size`
+- un run de dev local rapide vs un run de prod complet
+- un run incomplet sans artefacts
+
+### Règle simple
+
+Pour décider un déploiement, compare seulement :
+- des runs complets
+- avec le même type de données
+- sur une logique d'entraînement comparable
+
+---
+
+## 🧪 Comment lancer un entraînement avec MLflow
+
+### Variables d'environnement
 
 | Variable | Description | Exemple |
 |----------|-------------|---------|
-| `MLFLOW_TRACKING_URI` | URI du serveur MLflow Databricks | `databricks` ou URL complète |
-| `DATABRICKS_HOST` | Host Databricks | `https://dbc-576fb506-d185.cloud.databricks.com` |
-| `DATABRICKS_TOKEN` | Token d’accès | (secret) |
-| `MLFLOW_EXPERIMENT_NAME` | Nom de l’experiment | `/Shared/Sentinelle Production` |
+| `MLFLOW_TRACKING_URI` | backend MLflow | `databricks` |
+| `DATABRICKS_HOST` | host Databricks | `https://dbc-576fb506-d185.cloud.databricks.com` |
+| `DATABRICKS_TOKEN` | token d'accès | secret |
+| `MLFLOW_EXPERIMENT_NAME` | experiment principal | `/Shared/Sentinelle Production` |
 
-### Variables d'environnement (ML Engine – inférence)
+### Exemple local
 
-| Variable | Description | Valeur actuelle |
-|----------|-------------|-----------------|
-| `MONITORING_GCS_BUCKET` | Bucket pour les logs | sentinelle-485209-ml-data |
-| `MONITORING_GCS_PREFIX` | Préfixe des objets | monitoring/inference_logs |
-| `MONITORING_SAMPLE_RATE` | Taux d’échantillonnage | 0.1 (10 %) |
+```bash
+cd "/Users/kclo/Documents/2025/SCHOOL PROJECT/sentinelle/models"
+
+export MLFLOW_TRACKING_URI="databricks"
+export DATABRICKS_HOST="https://dbc-576fb506-d185.cloud.databricks.com"
+export DATABRICKS_TOKEN="<TOKEN>"
+export MLFLOW_EXPERIMENT_NAME="/Shared/Sentinelle Production"
+
+python3 scripts/train.py \
+  --version "2.0.2-mlflow" \
+  --local
+```
+
+### Exemple mode test rapide
+
+À ne pas utiliser pour une décision de déploiement finale :
+
+```bash
+cd "/Users/kclo/Documents/2025/SCHOOL PROJECT/sentinelle/models"
+
+export MLFLOW_TRACKING_URI="databricks"
+export DATABRICKS_HOST="https://dbc-576fb506-d185.cloud.databricks.com"
+export DATABRICKS_TOKEN="<TOKEN>"
+export MLFLOW_EXPERIMENT_NAME="/Shared/Sentinelle Production"
+
+python3 scripts/train.py \
+  --version "2.0.2-mlflow" \
+  --local \
+  --test-size 10000
+```
 
 ---
 
-## 📌 Checklist de suivi de l'intégration
+## 🖥️ Comment comparer deux runs dans MLflow
 
-### Phase 1 : Entraînement
+### Ce que tu fais dans l'interface
 
-- [ ] MLflow installé dans l’environnement d’entraînement - [x] `train.py` instrumenté avec `mlflow.start_run()`, `log_metric`, `log_param`, `log_artifact`
-- [x] Tracking URI Databricks configuré (local)
-- [x] Premier run visible dans MLflow : train-v2.0.1-mlflow (mars 2026)
-- [ ] Comparaison de 2 runs fonctionnelle dans l’UI MLflow
+1. Ouvrir l'experiment `/Shared/Sentinelle Production`
+2. Repérer les runs `train-v<version>`
+3. Cocher les 2 runs que tu veux comparer
+4. Cliquer sur **Compare**
 
-### Phase 2 : Inférence (drift via Vertex AI Model Monitoring)
+### Ce que tu lis en priorité
 
-- [x] Stratégie choisie : Vertex AI Model Monitoring (target = logs GCS `monitoring/inference_logs/`)
-- [ ] Runs de monitoring visibles dans Vertex AI (drift input/output)
-- [ ] Alertes ou seuils définis (optionnel)
+1. `val_pr_auc`
+2. `val_f1`
+3. `val_accuracy`
+4. `block_threshold`
+5. `review_threshold`
+6. présence des artefacts
 
-### Phase 3 : Documentation et processus
+### Décision
 
-- [ ] Procédure de lancement d’un entraînement documentée
-- [ ] Procédure de consultation des runs MLflow documentée
-- [ ] Rôle et responsabilités définis (qui consulte, qui lance, qui valide)
+À la fin, tu dois pouvoir répondre à :
+
+**"Est-ce que `train-vX` est meilleur que `train-vY` pour justifier un déploiement ?"**
+
+---
+
+## ✅ Run MLflow "propre" attendu
+
+Un run prêt à être comparé / utilisé doit contenir :
+
+- un nom clair : `train-v<version>`
+- les paramètres de contexte (`version`, `local`, `data_dir`, `config_dir`, `artifacts_dir`)
+- les métriques de validation
+- les métriques de contexte dataset
+- les seuils finaux
+- les artefacts essentiels
+- une recommandation de déploiement lisible
+
+### Minimum acceptable
+
+- `val_pr_auc`
+- `val_f1`
+- `block_threshold`
+- `review_threshold`
+- `feature_schema.json`
+- `thresholds.json`
+- `deployment_recommendation`
+- `candidate_for_deploy`
+
+---
+
+## ⚠️ Limites actuelles
+
+Le logging MLflow est déjà utile, mais reste centré sur la décision opérationnelle simple.
+
+Aujourd'hui, le code log :
+- les métriques de validation supervisée
+- les seuils finaux
+- les artefacts essentiels
+
+Il ne log pas encore explicitement :
+- des métriques dédiées au modèle non supervisé
+- des tags métier plus riches comme `reviewed_by` ou `deployment_decision_owner`
+- une comparaison automatique à une "version de référence métier" choisie manuellement
+
+Ce n'est pas bloquant pour commencer à comparer des versions.
+
+---
+
+## 📋 Checklist opérationnelle
+
+### Avant déploiement
+
+- [x] MLflow activé dans `train.py`
+- [x] run visible dans MLflow
+- [x] métriques principales visibles
+- [x] artefacts visibles
+- [ ] comparaison de 2 versions faite dans l'UI
+- [ ] décision explicite prise : garder l'ancienne version ou déployer la nouvelle
+
+### Après déploiement
+
+- [ ] vérifier `/health`
+- [ ] vérifier que la bonne version tourne en prod
+- [ ] surveiller le drift dans Vertex AI
 
 ---
 
@@ -222,34 +410,27 @@ Vertex AI calcule automatiquement :
 
 | Document | Contenu |
 |----------|---------|
-| [01_ENTRAINEMENT.md](01_ENTRAINEMENT.md) | Entraînement local et Cloud |
-| [04_DEPLOIEMENT.md](04_DEPLOIEMENT.md) | Déploiement ML Engine et jobs |
-| [06_MONITORING_VERTEX.md](06_MONITORING_VERTEX.md) | Vertex AI (opérationnel, drift via GCS) |
+| [01_ENTRAINEMENT.md](01_ENTRAINEMENT.md) | entraînement local et cloud |
+| [04_DEPLOIEMENT.md](04_DEPLOIEMENT.md) | déploiement ML Engine |
+| [06_MONITORING_VERTEX.md](06_MONITORING_VERTEX.md) | monitoring Vertex AI |
+| [08_MONITORING_VERTEX_RUN_AFTER_DEPLOY.md](08_MONITORING_VERTEX_RUN_AFTER_DEPLOY.md) | run Vertex après déploiement |
 
 ---
 
-## 🚀 Déploiement en production
+## 🧠 Résumé simple
 
-Après un entraînement avec MLflow :
-
-```bash
-cd models
-
-# 1. Upload des artefacts vers GCS
-./scripts/upload-artifacts.sh "2.0.1-mlflow"
-
-# 2. Déployer le ML Engine v2
-./scripts/deploy-ml-engine.sh "sentinelle-485209" "sentinelle-ml-engine-v2" "europe-west1" "2.0.1-mlflow"
-```
+- **MLflow** sert à choisir une version avant déploiement
+- **Vertex AI** sert à surveiller le comportement du modèle après déploiement
+- pour ton besoin, la question MLflow est :
+  - **"est-ce que cette version est meilleure que la précédente ?"**
+- la réponse doit se baser surtout sur :
+  - `val_pr_auc`
+  - `val_f1`
+  - les seuils
+  - les artefacts
 
 ---
 
-## ⚠️ Note sur Vertex AI
-
-Le monitoring via **Vertex AI Model Monitoring** est désormais opérationnel (drift input/output basé sur `monitoring/inference_logs/` + baseline exportée).
-
----
-
-**Version** : 1.0.0  
+**Version** : 2.0  
 **Dernière mise à jour** : Mars 2026  
-**Statut** : Phase 1 complétée – Intégration MLflow opérationnelle
+**Statut** : MLflow opérationnel pour comparer les entraînements
