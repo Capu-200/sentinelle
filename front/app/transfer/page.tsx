@@ -40,7 +40,7 @@ export default async function TransferPage() {
         <div className="flex min-h-[80vh] flex-col">
             {/* Header */}
             <div className="flex items-center gap-4 mb-6">
-                <Link href="/" className="rounded-full p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                <Link href="/" className="hidden md:inline-flex rounded-full p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                     <ArrowLeft className="h-6 w-6" />
                 </Link>
                 <h1 className="text-xl font-bold">Effectuer un virement</h1>

@@ -108,7 +108,7 @@ export const AddCommentButton = ({ transactionId, currentComment, onSuccess }: P
                                     type="submit"
                                     disabled={isSubmitting || comment.trim().length === 0}
                                     className={cn(
-                                        "flex-1 px-4 py-3 rounded-xl bg-primary text-primary-foreground font-medium transition-all flex items-center justify-center gap-2",
+                                        "flex-1 px-4 py-3 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white-foreground font-medium transition-all flex items-center justify-center gap-2",
                                         (isSubmitting || comment.trim().length === 0) && "opacity-50 cursor-not-allowed"
                                     )}
                                 >

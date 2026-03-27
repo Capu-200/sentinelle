@@ -64,7 +64,7 @@ export default function TrackingPage() {
             <div className="flex items-center gap-4">
                 <Link
                     href="/activity"
-                    className="rounded-full p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    className="hidden md:inline-flex rounded-full p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 >
                     <ArrowLeft className="h-6 w-6" />
                 </Link>
