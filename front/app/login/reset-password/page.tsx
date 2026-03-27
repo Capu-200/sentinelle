@@ -6,10 +6,10 @@ import { useRouter } from 'next/navigation';
 import { GlassCard } from '@/components/ui/glass-card';
 import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { resetPasswordAction } from '../../actions/auth';
+import { resetPasswordAction, type ResetPasswordState } from '../../actions/auth';
 import toast from 'react-hot-toast';
 
-const initialState = {
+const initialState: ResetPasswordState = {
     error: '',
     success: false,
     message: '',

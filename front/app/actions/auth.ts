@@ -27,6 +27,15 @@ const ResetPasswordSchema = z.object({
     password: z.string().min(6),
 });
 
+export type FormActionState = {
+    error: string;
+    success: boolean;
+    message: string;
+};
+
+export type ForgotPasswordState = FormActionState;
+export type ResetPasswordState = FormActionState;
+
 export async function registerAction(prevState: any, formData: FormData) {
     const data = {
         full_name: formData.get("name"), // form field is 'name' but we map to full_name for validation/backend
@@ -141,14 +150,17 @@ export async function logoutAction() {
     redirect("/login");
 }
 
-export async function forgotPasswordAction(prevState: any, formData: FormData) {
+export async function forgotPasswordAction(
+    prevState: ForgotPasswordState,
+    formData: FormData
+): Promise<ForgotPasswordState> {
     const data = {
         email: formData.get("email"),
     };
 
     const validated = ForgotPasswordSchema.safeParse(data);
     if (!validated.success) {
-        return { error: "Email invalide" };
+        return { error: "Email invalide", success: false, message: "" };
     }
 
     try {
@@ -160,17 +172,28 @@ export async function forgotPasswordAction(prevState: any, formData: FormData) {
 
         if (!res.ok) {
             const errorData = await res.json();
-            return { error: errorData.detail || "Erreur lors de la demande" };
+            return {
+                error: errorData.detail || "Erreur lors de la demande",
+                success: false,
+                message: "",
+            };
         }
 
-        return { success: true, message: "Un lien de réinitialisation a été envoyé (simulation)" };
+        return {
+            success: true,
+            message: "Un lien de réinitialisation a été envoyé (simulation)",
+            error: "",
+        };
     } catch (err) {
         console.error("Forgot Password Error:", err);
-        return { error: "Erreur de connexion au serveur" };
+        return { error: "Erreur de connexion au serveur", success: false, message: "" };
     }
 }
 
-export async function resetPasswordAction(prevState: any, formData: FormData) {
+export async function resetPasswordAction(
+    prevState: ResetPasswordState,
+    formData: FormData
+): Promise<ResetPasswordState> {
     const data = {
         email: formData.get("email"),
         password: formData.get("password"),
@@ -178,7 +201,7 @@ export async function resetPasswordAction(prevState: any, formData: FormData) {
 
     const validated = ResetPasswordSchema.safeParse(data);
     if (!validated.success) {
-        return { error: "Données invalides (mot de passe 6 caractères min)" };
+        return { error: "Données invalides (mot de passe 6 caractères min)", success: false, message: "" };
     }
 
     try {
@@ -193,12 +216,16 @@ export async function resetPasswordAction(prevState: any, formData: FormData) {
 
         if (!res.ok) {
             const errorData = await res.json();
-            return { error: errorData.detail || "Erreur lors de la réinitialisation" };
+            return {
+                error: errorData.detail || "Erreur lors de la réinitialisation",
+                success: false,
+                message: "",
+            };
         }
 
-        return { success: true, message: "Mot de passe modifié avec succès" };
+        return { success: true, message: "Mot de passe modifié avec succès", error: "" };
     } catch (err) {
         console.error("Reset Password Error:", err);
-        return { error: "Erreur de connexion au serveur" };
+        return { error: "Erreur de connexion au serveur", success: false, message: "" };
     }
 }

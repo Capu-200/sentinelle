@@ -6,10 +6,10 @@ import { useRouter } from 'next/navigation';
 import { GlassCard } from '@/components/ui/glass-card';
 import { Mail, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { forgotPasswordAction } from '../../actions/auth';
+import { forgotPasswordAction, type ForgotPasswordState } from '../../actions/auth';
 import toast from 'react-hot-toast';
 
-const initialState = {
+const initialState: ForgotPasswordState = {
     error: '',
     success: false,
     message: '',
