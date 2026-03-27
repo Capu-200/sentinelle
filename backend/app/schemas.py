@@ -58,7 +58,14 @@ class UserProfileResponse(BaseModel):
     risk_level: str
     trust_score: int
 
+class ContactSummary(BaseModel):
+    name: str
+    email: Optional[str] = None
+    iban: Optional[str] = None
+    is_internal: bool
+
 class DashboardData(BaseModel):
     user: UserProfileResponse
     wallet: Optional[WalletResponse]
     recent_transactions: List[TransactionResponseLite]
+    contacts: List[ContactSummary] = []
