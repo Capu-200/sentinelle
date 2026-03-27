@@ -1,9 +1,9 @@
 "use client";
 
 import { createTransferAction } from "@/app/actions";
-import { getContactsAction } from "@/app/actions/contacts"; // Import the new action
+import { getContactsAction } from "@/app/actions/contacts"; // Importation de la nouvelle action
 import { Send, RefreshCw, ShieldCheck } from "lucide-react";
-import { useActionState, useState, useEffect } from "react"; // Added useActionState
+import { useActionState, useState, useEffect } from "react"; // Ajout de useActionState
 import { useFormStatus } from "react-dom";
 import { cn } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
@@ -30,7 +30,7 @@ function SubmitButton() {
             type="submit"
             disabled={pending}
             className={cn(
-                "group mt-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 font-bold text-primary-foreground shadow-xl transition-all active:scale-95 disabled:opacity-70 disabled:active:scale-100",
+                "group mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 py-4 font-bold text-white-foreground shadow-xl transition-all active:scale-95 disabled:opacity-70 disabled:active:scale-100",
                 pending && "cursor-not-allowed opacity-80"
             )}
         >
@@ -50,13 +50,13 @@ export function TransferForm({ contacts: initialContacts }: Props) {
     const searchParams = useSearchParams();
     const initialRecipient = searchParams.get("to") || "";
 
-    // Initial state for the form action
+    // État initial pour l'action du form
     const initialState = {
         success: false,
         message: "",
     };
 
-    // Use useActionState instead of useFormState
+    // Utiliser useActionState au lieu de useFormState
     // @ts-ignore
     const [state, formAction] = useActionState(createTransferAction, initialState);
 
@@ -84,7 +84,7 @@ export function TransferForm({ contacts: initialContacts }: Props) {
         fetchContacts();
     }, [contacts.length]);
 
-    // Filter valid contacts (those with email or iban)
+    // Filtrer les contacts valides (ceux avec email ou iban)
     const validContacts = contacts.filter(c => c.email || c.iban);
 
     // Auto-select contact logic if `initialRecipient` matches a contact ID or email
@@ -100,10 +100,10 @@ export function TransferForm({ contacts: initialContacts }: Props) {
         }
     }, [initialRecipient, contacts]);
 
-    // Reset dismissed state when submitting again
+    // Réinitialiser l'état dismissed lors de la soumission du form
     useEffect(() => {
         if (state?.message) {
-            setErrorDismissed(false); // New error arrived, show screen
+            setErrorDismissed(false); // Nouveau message d'erreur, afficher l'écran de blocage
         }
     }, [state]);
 
@@ -111,7 +111,7 @@ export function TransferForm({ contacts: initialContacts }: Props) {
         setRecipient(contact.email || contact.iban || "");
     };
 
-    // If we have a fresh server error and haven't dismissed it, show BLOCK SCREEN
+    // Si nous avons une erreur serveur fraîche et que nous n'avons pas encore laissé de message d'erreur, afficher l'écran de blocage
     if (state?.message && !state.success && !errorDismissed) {
         return (
             <div className="flex flex-1 flex-col items-center justify-center p-6 text-center animate-in zoom-in-95 duration-300">
@@ -144,18 +144,18 @@ export function TransferForm({ contacts: initialContacts }: Props) {
         <form action={formAction} className="relative flex flex-1 flex-col h-full">
             <TransactionLoader />
             {/* ... Form Content ... */}
-            <div className="space-y-4 pt-4">
+            <div className="space-y-4 py-4">
                 <label className="text-sm font-medium text-muted-foreground ml-1">Pour qui ?</label>
 
-                {/* Quick Access List */}
+                {/* Liste d'accès rapide */}
                 {isLoading ? (
-                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide opacity-50">
+                    <div className="flex gap-3 overflow-x-auto pt-1.5 pb-2 scrollbar-hide opacity-50">
                         {[1, 2, 3].map(i => (
                             <div key={i} className="h-10 w-24 bg-slate-100 rounded-full animate-pulse" />
                         ))}
                     </div>
                 ) : validContacts.length > 0 ? (
-                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                    <div className="flex gap-3 overflow-x-auto pt-1.5 pb-2 scrollbar-hide">
                         {validContacts.map((c) => (
                             <div
                                 key={c.contact_id}
@@ -191,7 +191,7 @@ export function TransferForm({ contacts: initialContacts }: Props) {
                         onChange={(e) => setRecipient(e.target.value)}
                         className="w-full rounded-xl border-0 bg-slate-100 px-4 py-4 text-base outline-none ring-1 ring-transparent focus:bg-white focus:ring-primary/20 transition-all dark:bg-slate-800 dark:focus:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400"
                     />
-                    {/* Status Indicator inside input */}
+                    {/* Indicateur de statutà l'intérieur du champ */}
                     {recipient && (
                         <div className="absolute right-3 top-1/2 -translate-y-1/2">
                             {contacts.find(c => c.email === recipient) ? (
@@ -204,8 +204,8 @@ export function TransferForm({ contacts: initialContacts }: Props) {
                 </div>
             </div>
 
-            {/* Comment Field (Optional) */}
-            <div className="space-y-2">
+            {/* Champ Commentaire (Optionnel) */}
+            <div className="space-y-2 flex flex-col gap-0.5">
                 <label htmlFor="comment" className="text-sm font-medium text-muted-foreground ml-1">Commentaire (optionnel)</label>
                 <textarea
                     name="comment"
@@ -216,7 +216,7 @@ export function TransferForm({ contacts: initialContacts }: Props) {
                 />
             </div>
 
-            {/* Giant Amount Input (Centered vertically) */}
+            {/* Champ Montant (Centré verticalement) */}
             <div className="flex-1 flex flex-col items-center justify-center gap-4 min-h-[200px]">
                 <label htmlFor="amount" className="text-sm font-medium text-muted-foreground uppercase tracking-widest">
                     Montant à envoyer
@@ -231,7 +231,7 @@ export function TransferForm({ contacts: initialContacts }: Props) {
                         placeholder="0"
                         value={amount}
                         onChange={(e) => {
-                            const val = e.target.value.replace(',', '.'); // Allow comma as decimal separator
+                            const val = e.target.value.replace(',', '.'); // Permettre la virgule comme séparateur décimal
                             if (val === '' || /^\d*\.?\d{0,2}$/.test(val)) {
                                 setAmount(val);
                             }
@@ -243,10 +243,10 @@ export function TransferForm({ contacts: initialContacts }: Props) {
                 </div>
             </div>
 
-            {/* Bottom Actions */}
+            {/* Bas des actions */}
             <div className="mt-auto pb-4 space-y-4">
 
-                {/* Error Message Display */}
+                {/* Affichage du message d'erreur */}
                 {state?.message && !state.success && (
                     <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-xl flex items-center gap-2 text-sm font-medium animate-in fade-in slide-in-from-bottom-2 border border-red-100 dark:border-red-900">
                         <div className="h-5 w-5 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center shrink-0 font-bold">!</div>
