@@ -1,3 +1,4 @@
+mlflow>=2.9.0
 pandas>=2.2.0
 python-dateutil>=2.9.0
 pyyaml>=6.0
@@ -9,3 +10,5 @@ fastapi>=0.104.0
 uvicorn>=0.24.0
 pydantic>=2.0.0
 google-cloud-storage>=2.0.0
+google-cloud-bigquery>=3.0.0
+google-cloud-aiplatform>=1.0.0

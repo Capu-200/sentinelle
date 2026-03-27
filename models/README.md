@@ -95,15 +95,26 @@ Retourne {risk_score, decision, reasons}
 
 ---
 
-### 📊 [06_MONITORING_VERTEX.md](06_MONITORING_VERTEX.md)
-**Pour** : Monitorer le modèle en production avec Vertex AI (GCS)
+### 📊 [07_MONITORING_MLFLOW.md](07_MONITORING_MLFLOW.md)
+**Pour** : 
+1) Entraîner et versionner les artefacts avec MLflow,  
+2) Monitorer le drift en production avec Vertex AI Model Monitoring (logs GCS)
 
-- Logging des inferences vers GCS (variables d’env Cloud Run)
-- Export baseline optionnel depuis l’entraînement
-- Script Vertex : reference model + Model Monitor
-- Lancer des jobs (Run now, Schedule)
+- Objectif : entraînement (MLflow) + monitoring drift prod (Vertex AI)
+- Logs d’inférence pris dans `monitoring/inference_logs/` (GCS)
+- Baseline optionnelle depuis `monitoring/baseline/<version>/...`
+- Checklist + configuration
 
-**Quand l'utiliser** : Pour configurer le monitoring drift/qualité du modèle (source GCS uniquement)
+**Quand l'utiliser** : Pour le suivi des performances et l'intégration MLflow
+
+---
+
+### 📋 [06_MONITORING_VERTEX.md](06_MONITORING_VERTEX.md)
+**Pour** : Référence Vertex AI (opérationnel) – Voir [07_MONITORING_MLFLOW.md](07_MONITORING_MLFLOW.md) pour le suivi complet.
+
+---
+### 📌 [08_MONITORING_VERTEX_RUN_AFTER_DEPLOY.md](08_MONITORING_VERTEX_RUN_AFTER_DEPLOY.md)
+**Pour** : Procédure automatisée/reproductible pour lancer un run Vertex AI après chaque nouveau déploiement de modèle, à partir du trafic réel en prod, avec pipeline `GCS -> BigQuery -> vue 24h -> Vertex`
 
 ---
 
@@ -202,7 +213,7 @@ models/
 - **Intégrer l'API ?** → Voir [03_SCORING.md](03_SCORING.md)
 - **Déployer en production ?** → Voir [04_DEPLOIEMENT.md](04_DEPLOIEMENT.md)
 - **Tester avec Postman ?** → Voir [05_POSTMAN_TESTS.md](05_POSTMAN_TESTS.md)
-- **Monitorer le modèle (Vertex, GCS) ?** → Voir [06_MONITORING_VERTEX.md](06_MONITORING_VERTEX.md)
+- **Monitorer les modèles (Vertex AI drift + MLflow entraînement) ?** → Voir [07_MONITORING_MLFLOW.md](07_MONITORING_MLFLOW.md)
 
 ---
 

@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+from sklearn.metrics import accuracy_score, average_precision_score, f1_score
 
 # Ajouter le répertoire parent au PYTHONPATH
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -110,6 +111,24 @@ def main():
 
     args = parser.parse_args()
 
+    # MLflow : activé si MLFLOW_EXPERIMENT_NAME ou MLFLOW_TRACKING_URI est défini
+    use_mlflow = bool(os.getenv("MLFLOW_EXPERIMENT_NAME") or os.getenv("MLFLOW_TRACKING_URI"))
+    if use_mlflow:
+        import mlflow
+        exp_name = os.getenv("MLFLOW_EXPERIMENT_NAME", "/Shared/Sentinelle Production")
+        mlflow.set_experiment(exp_name)
+        mlflow.start_run(run_name=f"train-v{args.version}")
+        mlflow.log_params({
+            "version": args.version,
+            "local": str(args.local),
+            "data_dir": str(args.data_dir),
+            "config_dir": str(args.config_dir),
+            "artifacts_dir": str(args.artifacts_dir),
+        })
+        if args.test_size:
+            mlflow.log_param("test_size", args.test_size)
+        print(f"📊 MLflow: run démarré (experiment: {exp_name})")
+
     print(f"🚀 Démarrage de l'entraînement (version {args.version})")
     print(f"📁 Données : {args.data_dir}")
     print(f"⚙️  Config : {args.config_dir}")
@@ -157,6 +176,11 @@ def main():
     payon_df = pd.read_csv(payon_path)
     payon_df["created_at"] = pd.to_datetime(payon_df["created_at"], utc=True)
     print(f"   ✅ {len(payon_df)} transactions chargées")
+
+    # Mode test : limiter Payon aussi (même limite que PaySim)
+    if args.test_size is not None:
+        payon_df = payon_df.sort_values("created_at").tail(args.test_size).reset_index(drop=True)
+        print(f"   ✅ Payon limité à {len(payon_df):,} transactions (mode test)")
     
     # Split temporel Payon (utilise le DataFrame déjà chargé pour éviter le rechargement)
     print(f"\n📊 Split temporel Payon...")
@@ -270,6 +294,14 @@ def main():
         )
         
         print(f"✅ Modèle supervisé entraîné")
+
+        # Métriques validation pour MLflow
+        if use_mlflow and paysim_val_labels is not None:
+            val_proba = supervised_model.predict(paysim_val_features)
+            val_pred_binary = (val_proba >= 0.5).astype(int)
+            mlflow.log_metric("val_accuracy", float(accuracy_score(paysim_val_labels, val_pred_binary)))
+            mlflow.log_metric("val_f1", float(f1_score(paysim_val_labels, val_pred_binary, zero_division=0)))
+            mlflow.log_metric("val_pr_auc", float(average_precision_score(paysim_val_labels, val_proba)))
     
     # ========== 4. ENTRAÎNEMENT NON SUPERVISÉ ==========
     print("\n" + "=" * 60)
@@ -366,6 +398,10 @@ def main():
     print(f"   REVIEW threshold: {review_threshold:.4f} (top 1%)")
     print(f"   💡 En production, une transaction avec score ≥ {block_threshold:.4f} sera BLOCK")
     print(f"   💡 En production, une transaction avec score ≥ {review_threshold:.4f} sera REVIEW")
+
+    if use_mlflow:
+        mlflow.log_metric("block_threshold", float(block_threshold))
+        mlflow.log_metric("review_threshold", float(review_threshold))
     
     # ========== 6. SAUVEGARDE DES ARTEFACTS ==========
     print("\n" + "=" * 60)
@@ -409,8 +445,18 @@ def main():
     latest_path.symlink_to(f"v{args.version}")
     print(f"✅ Symlink 'latest' → v{args.version}")
 
-    # Export baseline Vertex (optionnel) : features d'entraînement vers GCS
+    # MLflow : log des artefacts
     export_bucket = os.getenv("EXPORT_BASELINE_GCS_BUCKET", "").strip()
+    if use_mlflow:
+        mlflow.log_artifact(str(schema_path))
+        mlflow.log_artifact(str(thresholds_path))
+        baseline_path = version_dir / "baseline_train.jsonl"
+        payon_train_features.head(1000).to_json(
+            baseline_path, orient="records", lines=True, date_format="iso"
+        )
+        mlflow.log_artifact(str(baseline_path))
+
+    # Export baseline Vertex (optionnel) : features d'entraînement vers GCS
     if export_bucket:
         try:
             from google.cloud import storage
@@ -439,6 +485,11 @@ def main():
     print(f"\nSeuils:")
     print(f"  BLOCK: {block_threshold:.4f}")
     print(f"  REVIEW: {review_threshold:.4f}")
+
+    if use_mlflow:
+        import mlflow
+        mlflow.end_run()
+        print(f"📊 MLflow: run terminé")
 
 
 if __name__ == "__main__":
