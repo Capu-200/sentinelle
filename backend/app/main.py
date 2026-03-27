@@ -2,6 +2,7 @@
 FastAPI Application - Fraud Detection Backend.
 """
 import logging
+import os
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -92,10 +93,6 @@ class TransactionCreateResponse(BaseModel):
     transaction_id: str
     status: str
     message: str
-    risk_score: float
-    decision: str
-    reasons: List[str]
-    model_version: str
 
 
 # ========== FONCTIONS UTILITAIRES ==========
@@ -425,15 +422,9 @@ async def get_transactions(
     limit: int = 50,
     skip: int = 0,
 ):
-    """
-    Récupère l'historique des transactions de l'utilisateur connecté.
-    (Initiateur OU Destinataire)
-    Enrichi avec les informations de pays source et destination.
-    """
-    user_wallets_stmt = select(Wallet.wallet_id).where(Wallet.user_id == current_user.user_id)
-    user_wallet_ids = db.execute(user_wallets_stmt).scalars().all()
-    if not user_wallet_ids:
-        user_wallet_ids = []
+    """Return the current user's transactions enriched with direction highlights."""
+    wallet_ids_stmt = select(Wallet.wallet_id).where(Wallet.user_id == current_user.user_id)
+    user_wallet_ids = db.execute(wallet_ids_stmt).scalars().all()
 
     stmt = (
         select(Transaction)
@@ -448,78 +439,49 @@ async def get_transactions(
     )
     transactions = db.execute(stmt).scalars().all()
 
-    return [
-        TransactionResponseLite(
-            transaction_id=tx.transaction_id,
-            amount=float(tx.amount),
-            currency=tx.currency,
-            transaction_type=tx.transaction_type,
-            direction="INCOMING"
-            if tx.destination_wallet_id in user_wallet_ids and tx.source_wallet_id not in user_wallet_ids
-            else tx.direction,
-            status=map_kyc_status_to_public(tx.kyc_status),
-            recipient_name=tx.description or "Destinataire Inconnu",
-            created_at=tx.created_at,
-        )
-        for tx in transactions
-    ]
-    
-    result = []
+    results: List[TransactionResponseLite] = []
     for tx in transactions:
-        # Déterminer la direction relative à l'utilisateur actuel
-        is_incoming = tx.destination_wallet_id in user_wallet_ids and tx.source_wallet_id not in user_wallet_ids
+        is_incoming = tx.destination_wallet_id in user_wallet_ids and (
+            not tx.source_wallet_id or tx.source_wallet_id not in user_wallet_ids
+        )
         direction = "INCOMING" if is_incoming else tx.direction
-        
-        # Récupérer le pays source (initiateur)
-        source_country = "FR" # Fallback par défaut si info manquante
+
+        source_country = None
         if tx.initiator_user_id:
-            initiator_stmt = select(User).where(User.user_id == tx.initiator_user_id)
-            initiator = db.execute(initiator_stmt).scalars().first()
-            if initiator and initiator.country_home:
+            initiator = db.get(User, tx.initiator_user_id)
+            if initiator:
                 source_country = initiator.country_home
-        
-        # Récupérer le pays destination (destinataire)
+
         destination_country = None
         recipient_email = None
         if tx.destination_wallet_id:
-            # Trouver l'utilisateur propriétaire du wallet de destination
-            dest_wallet_stmt = select(Wallet).where(Wallet.wallet_id == tx.destination_wallet_id)
-            dest_wallet = db.execute(dest_wallet_stmt).scalars().first()
+            dest_wallet = db.get(Wallet, tx.destination_wallet_id)
             if dest_wallet and dest_wallet.user_id:
-                dest_user_stmt = select(User).where(User.user_id == dest_wallet.user_id)
-                dest_user = db.execute(dest_user_stmt).scalars().first()
+                dest_user = db.get(User, dest_wallet.user_id)
                 if dest_user:
                     destination_country = dest_user.country_home
                     recipient_email = dest_user.email
-        
-        # Nom du destinataire (Logique améliorée pour éviter doublon commentaire)
-        # Priorité: 1. Description (sauf si c'est un commentaire long) 2. Email 3. Inconnu
-        # Si description == comment, on évite de l'utiliser comme Nom
-        
-        recipient_name = "Destinataire Inconnu"
-        if recipient_email:
-             recipient_name = recipient_email
-        elif tx.description and len(tx.description) < 30: # Use description as name only if short-ish
-             recipient_name = tx.description
-        
-        result.append(
+
+        recipient_name = tx.description or recipient_email or "Destinataire Inconnu"
+
+        results.append(
             TransactionResponseLite(
                 transaction_id=tx.transaction_id,
                 amount=float(tx.amount),
                 currency=tx.currency,
                 transaction_type=tx.transaction_type,
                 direction=direction,
-                status=tx.kyc_status,
+                status=map_kyc_status_to_public(tx.kyc_status),
                 recipient_name=recipient_name,
                 recipient_email=recipient_email,
                 created_at=tx.created_at,
                 source_country=source_country,
                 destination_country=destination_country,
-                comment=tx.description  # Utiliser description comme commentaire
+                comment=tx.description,
             )
         )
-    
-    return result
+
+    return results
 
 
 @app.get("/debug/transactions/{transaction_id}", response_model=TransactionDebugResponse)
