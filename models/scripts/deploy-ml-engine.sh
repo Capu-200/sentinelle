@@ -5,7 +5,7 @@
 set -e
 
 PROJECT_ID=${1:-"sentinelle-485209"}
-SERVICE_NAME=${2:-"sentinelle-ml-engine"}
+SERVICE_NAME=${2:-"sentinelle-ml-engine-v2"}
 REGION=${3:-"europe-west1"}
 MODEL_VERSION=${4:-"latest"}
 

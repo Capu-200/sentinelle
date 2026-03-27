@@ -47,7 +47,7 @@ export default async function ProfilePage() {
     <div className="max-w-md mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/" className="rounded-full p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+        <Link href="/" className="hidden md:inline-flex rounded-full p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
           <ArrowLeft className="h-6 w-6" />
         </Link>
         <h1 className="text-2xl font-bold">Mon Profil</h1>

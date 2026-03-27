@@ -21,7 +21,7 @@ Références : **EXEMPLES_JSON_HISTORIQUE.md**, **JSON_COMPLET_50_FEATURES.md**.
 Remplacer par l’URL réelle de ton déploiement Cloud Run si besoin.
 
 ```
-https://sentinelle-ml-engine-ntqku76mya-ew.a.run.app
+https://sentinelle-ml-engine-v2-ntqku76mya-ew.a.run.app
 ```
 
 ---
@@ -44,7 +44,7 @@ Vérifier que le service et les modèles sont disponibles.
 | Champ   | Valeur |
 |---------|--------|
 | **Method** | `GET` |
-| **URL**    | `https://sentinelle-ml-engine-ntqku76mya-ew.a.run.app/health` |
+| **URL**    | `https://sentinelle-ml-engine-v2-ntqku76mya-ew.a.run.app/health` |
 | **Body**   | Aucun |
 
 ### Réponse attendue (200)
@@ -69,7 +69,7 @@ Transaction avec historique cohérent, bénéficiaire connu. Décision attendue 
 | Champ   | Valeur |
 |---------|--------|
 | **Method** | `POST` |
-| **URL**    | `https://sentinelle-ml-engine-ntqku76mya-ew.a.run.app/score` |
+| **URL**    | `https://sentinelle-ml-engine-v2-ntqku76mya-ew.a.run.app/score` |
 | **Body**   | Voir ci‑dessous |
 
 ### Body (JSON)
@@ -146,7 +146,7 @@ Vélocité élevée, nouveau bénéficiaire. Décision attendue : **REVIEW**.
 | Champ   | Valeur |
 |---------|--------|
 | **Method** | `POST` |
-| **URL**    | `https://sentinelle-ml-engine-ntqku76mya-ew.a.run.app/score` |
+| **URL**    | `https://sentinelle-ml-engine-v2-ntqku76mya-ew.a.run.app/score` |
 | **Body**   | Voir ci‑dessous |
 
 ### Body (JSON)
@@ -223,7 +223,7 @@ Montant > 300 → règle R1 (MAX_AMOUNT). Décision attendue : **BLOCK** sans pa
 | Champ   | Valeur |
 |---------|--------|
 | **Method** | `POST` |
-| **URL**    | `https://sentinelle-ml-engine-ntqku76mya-ew.a.run.app/score` |
+| **URL**    | `https://sentinelle-ml-engine-v2-ntqku76mya-ew.a.run.app/score` |
 | **Body**   | Voir ci‑dessous |
 
 ### Body (JSON)
@@ -300,7 +300,7 @@ Historique vide, valeurs “nouveau compte”. Décision attendue : **APPROVE** 
 | Champ   | Valeur |
 |---------|--------|
 | **Method** | `POST` |
-| **URL**    | `https://sentinelle-ml-engine-ntqku76mya-ew.a.run.app/score` |
+| **URL**    | `https://sentinelle-ml-engine-v2-ntqku76mya-ew.a.run.app/score` |
 | **Body**   | Voir ci‑dessous |
 
 ### Body (JSON)
@@ -372,7 +372,7 @@ Transaction sans `features.transactional` / `features.historical`. Réponse atte
 | Champ   | Valeur |
 |---------|--------|
 | **Method** | `POST` |
-| **URL**    | `https://sentinelle-ml-engine-ntqku76mya-ew.a.run.app/score` |
+| **URL**    | `https://sentinelle-ml-engine-v2-ntqku76mya-ew.a.run.app/score` |
 | **Body**   | Voir ci‑dessous |
 
 ### Body (JSON) – volontairement invalide
@@ -447,7 +447,7 @@ Les valeurs réelles dépendent du modèle déployé (voir `artifacts/vX.X.X/thr
 
 - Consulter les logs Cloud Run :
   ```bash
-  gcloud run services logs read sentinelle-ml-engine --region=europe-west1 --project=sentinelle-485209 --limit=50
+  gcloud run services logs read sentinelle-ml-engine-v2 --region=europe-west1 --project=sentinelle-485209 --limit=50
   ```
 - Tester le health check : `GET .../health`.
 

@@ -1,8 +1,12 @@
 # Vertex AI Model Monitoring – Service Cloud Run (GCS)
 
+> ✅ **Statut : Opérationnel** – Le monitoring drift input/output est mis en place via **Vertex AI Model Monitoring** à partir des logs d’inférence écrits en **GCS** (baseline optionnelle depuis l’entraînement).
+
+---
+
 Guide pour monitorer le modèle Payon servi sur **Cloud Run** avec **Vertex AI Model Monitoring v2**, en utilisant **Google Cloud Storage (GCS)** comme source de données.
 
-> **Choix Payon** : les logs d’inférence et la baseline sont stockés dans **GCS** (bucket `sentinelle-485209-ml-data`). Vertex lit ces données pour le drift. BigQuery n’est pas utilisé dans cette setup.
+> **Choix Payon** : les logs d’inférence sont écrits en **GCS**, puis ingérés/ciblés via **BigQuery** (vue recommandée : `sentinelle-485209.ml_monitoring.inference_logs_last_24h`) pour les runs Vertex. La baseline reste stockée dans GCS.
 
 ---
 
@@ -35,7 +39,7 @@ L’API ML Engine écrit déjà les scores dans GCS si `MONITORING_GCS_BUCKET` e
 
 ## Étape 1 – Exporter les données de scoring vers GCS
 
-**Source de données utilisée dans Payon : GCS uniquement.**
+**Source de données utilisée dans Payon : GCS + BigQuery (recommandé pour les runs Vertex).**
 
 L’API ML Engine écrit chaque score (ou un échantillon) dans des objets JSONL dans le bucket.
 
@@ -119,14 +123,14 @@ python3 scripts/vertex_setup_monitoring.py
 
 ## Étape 5 – Lancer des jobs de monitoring
 
-- **À la demande** : console **Vertex AI → Model monitoring** → ouvrir le Model Monitor → **Run now** → choisir la **target** = `gs://sentinelle-485209-ml-data/monitoring/inference_logs/` (ou un sous-dossier contenant des JSONL). Baseline = chemin GCS de la baseline si configurée.
-- **Planifié** : **Schedule a recurring run** → target = même chemin GCS ; pour les fenêtres temporelles, les fichiers doivent contenir un champ `request_time` (déjà le cas dans les logs Payon).
+- **À la demande** : console **Vertex AI → Model monitoring** → ouvrir le Model Monitor → **Run now** → choisir la **target** = table/vue BigQuery (recommandé : `bq://sentinelle-485209.ml_monitoring.inference_logs_last_24h`). Baseline = chemin GCS de la baseline si configurée.
+- **Planifié** : **Schedule a recurring run** → target = même table/vue BigQuery ; `request_time` sert de colonne temporelle.
 
 Les résultats (drift par feature, par prédiction, alertes) sont dans la console Monitoring et, si configuré, dans un bucket GCS de sortie.
 
 ---
 
-## Récap des étapes (GCS uniquement)
+## Récap des étapes (GCS + BigQuery)
 
 | # | Action | Où / Comment |
 |---|--------|--------------|
@@ -134,7 +138,7 @@ Les résultats (drift par feature, par prédiction, alertes) sont dans la consol
 | 2 | Enregistrer le modèle Payon | Vertex Model Registry en “reference model” (script ou console) |
 | 3 | Définir le schéma | `feature_schema.json` + risk_score/decision (script ou manuel) |
 | 4 | Créer le Model Monitor | Script `vertex_setup_monitoring.py` ou console : modèle, schéma, baseline GCS optionnelle, objectifs drift, notifications |
-| 5 | Lancer les jobs | Run now ou Schedule, target = `gs://sentinelle-485209-ml-data/monitoring/inference_logs/` |
+| 5 | Lancer les jobs | Run now ou Schedule, target = `bq://sentinelle-485209.ml_monitoring.inference_logs_last_24h` |
 
 ---
 
@@ -177,6 +181,6 @@ Sur cette page : **Configure monitoring**, liste des Model Monitors, **Run now**
 
 - **Aujourd’hui** : l’API écrit directement dans GCS (`monitoring/inference_logs/`). Vertex lit ce chemin.
 - **Avec Kafka** : un consumer peut écrire les events “scoring completed” dans le même bucket (même schéma de fichiers JSONL). Vertex et le Model Monitor restent inchangés, seule la source des fichiers change.
-- **Grafana** : pour des dashboards métier (volumes, décisions, scores), tu peux soit interroger des exports agrégés, soit ajouter plus tard un sink BigQuery/Prometheus alimenté depuis Kafka ou depuis une lecture du bucket ; Vertex reste branché sur GCS pour le drift.
+- **Grafana** : pour des dashboards métier (volumes, décisions, scores), tu peux interroger BigQuery ou ajouter un sink Prometheus/Kafka ; Vertex reste branché sur BigQuery pour les runs de drift.
 
-En résumé : **GCS comme pivot** pour Vertex, et **Kafka comme bus d’events** plus tard si besoin.
+En résumé : **GCS pour l’atterrissage des logs**, **BigQuery comme cible Vertex pour les runs**, et **Kafka** possible plus tard comme bus d’events.

@@ -45,7 +45,7 @@ export const TransactionItem = ({ transaction }: Props) => {
     };
 
     return (
-        <div className="flex flex-col gap-2 p-4 border rounded-xl bg-card hover:bg-accent/50 transition-colors">
+        <div className="flex flex-col gap-2 p-4 border border-slate-100 dark:border-slate-800 rounded-xl bg-slate-950 hover:bg-slate-900 transition-colors">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <div className={cn(

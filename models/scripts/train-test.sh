@@ -43,7 +43,7 @@ fi
 
 # Lancer l'entraînement en mode test
 echo "📊 Démarrage de l'entraînement TEST..."
-echo "   💡 Mode test: $TEST_SIZE transactions PaySim (les plus récentes)"
+echo "   💡 Mode test: $TEST_SIZE transactions PaySim + Payon (les plus récentes)"
 echo "   💡 Utilise tous les cores disponibles"
 echo ""
 
