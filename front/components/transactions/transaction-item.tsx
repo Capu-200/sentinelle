@@ -28,6 +28,26 @@ const CountryFlag = ({ code }: { code?: string }) => {
     );
 };
 
+const REASON_TRANSLATIONS: Record<string, string> = {
+    "RULE_MAX_AMOUNT": "Montant supérieur à la limite autorisée",
+    "RULE_INSUFFICIENT_FUNDS": "Solde insuffisant",
+    "RULE_ACCOUNT_LOCKED": "Compte ou portefeuille bloqué",
+    "RULE_SELF_TRANSFER": "Virement vers soi-même interdit",
+    "RULE_INVALID_AMOUNT": "Montant invalide",
+    "RULE_COUNTRY_BLOCKED": "Destination non autorisée",
+    "RULE_DESTINATION_LOCKED": "Le portefeuille cible est bloqué",
+    "RULE_AMOUNT_ANOMALY": "Montant très inhabituel pour vos habitudes",
+    "RULE_FREQ_SPIKE": "Pic d'activité (trop de virements successifs)",
+    "RULE_NEW_ACCOUNT_ACTIVITY": "Activité suspecte (nouveau compte)",
+    "RULE_NEW_BENEFICIARY": "Montant trop élevé vers un inconnu",
+    "RULE_GEO_ANOMALY": "Localisation ou trajet inhabituel",
+    "RULE_ODD_HOUR": "Virement nocturne suspect",
+    "RULE_HIGH_RISK_PROFILE": "Profil à risque nécessitant contrôle",
+    "RULE_RECIDIVISM": "Activité récidiviste suspecte",
+    "RULE_CIRCULAR_FLOW": "Mouvement de fonds circulaire détecté",
+    "ML_BLOCK": "Confiance très faible estimée par l'IA",
+};
+
 export const TransactionItem = ({ transaction }: Props) => {
     const isIncoming = transaction.direction === 'INCOMING';
     const hasComment = transaction.comment && transaction.comment.trim().length > 0;
@@ -47,9 +67,9 @@ export const TransactionItem = ({ transaction }: Props) => {
     return (
         <div className="flex flex-col gap-2 p-4 border border-slate-100 dark:border-slate-800 rounded-xl bg-slate-950 hover:bg-slate-900 transition-colors">
             <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 flex-1 min-w-0">
                     <div className={cn(
-                        "h-10 w-10 flex items-center justify-center rounded-full",
+                        "h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-full",
                         isIncoming ? "bg-green-100 dark:bg-green-900/30" : "bg-slate-100 dark:bg-slate-800"
                     )}>
                         {isIncoming ? (
@@ -58,16 +78,16 @@ export const TransactionItem = ({ transaction }: Props) => {
                             <ArrowUpRight className="h-5 w-5 text-slate-600 dark:text-slate-400" />
                         )}
                     </div>
-                    <div>
-                        <p className="font-medium text-sm text-foreground">{transaction.recipient}</p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>{new Date(transaction.date).toLocaleDateString()}</span>
+                    <div className="min-w-0 flex-1 pr-2">
+                        <p className="font-medium text-sm text-foreground truncate" title={transaction.recipient}>{transaction.recipient}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                            <span className="flex-shrink-0">{new Date(transaction.date).toLocaleDateString()}</span>
                             <CountryRouteDisplay />
                         </div>
                     </div>
                 </div>
 
-                <div className="text-right">
+                <div className="text-right flex-shrink-0">
                     <p className={cn(
                         "font-bold text-sm",
                         isIncoming ? "text-green-600 dark:text-green-400" : "text-foreground"
@@ -89,6 +109,35 @@ export const TransactionItem = ({ transaction }: Props) => {
                     </p>
                 </div>
             )}
+
+            {/* Raisons d'alerte / blocage IA */}
+            {transaction.reasons && transaction.reasons.length > 0 && (() => {
+                const isDefinitive = ['REJECTED', 'BLOCK'].includes(transaction.status);
+                const isWarning = ['REVIEW', 'SUSPECT'].includes(transaction.status);
+                if (!isDefinitive && !isWarning) return null;
+
+                const alertStyle = isDefinitive
+                    ? "bg-red-50 dark:bg-red-950/30 border-red-100 dark:border-red-900/50 text-red-600 dark:text-red-400"
+                    : "bg-amber-50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/50 text-amber-600 dark:text-amber-400";
+                const textStyle = isDefinitive
+                    ? "text-red-700 dark:text-red-300"
+                    : "text-amber-700 dark:text-amber-300";
+                const label = isDefinitive ? "Transaction bloquée" : "Avertissement";
+
+                return (
+                    <div className={`flex flex-col gap-1 mt-1 p-3 rounded-lg border ${alertStyle}`}>
+                        <div className="flex items-center gap-1.5 mb-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>
+                            <span className="text-[10px] font-bold uppercase tracking-wider">{label}</span>
+                        </div>
+                        {transaction.reasons.map((reason, idx) => (
+                            <p key={idx} className={`text-xs font-medium leading-relaxed ${textStyle}`}>
+                                • {REASON_TRANSLATIONS[reason] || reason.replace("RULE_", "").replace(/_/g, " ")}
+                            </p>
+                        ))}
+                    </div>
+                );
+            })()}
 
             {/* Action Footer */}
             <div className="flex items-center justify-end pt-2 border-t border-slate-100 dark:border-slate-800">

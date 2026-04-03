@@ -5,7 +5,7 @@ from sqlmodel import Session, select
 
 from ..auth import require_active_user
 from ..database import get_db
-from ..models import Contact, Transaction, User, Wallet
+from ..auth import require_active_user, get_current_user
 from ..schemas import (
     ContactSummary,
     DashboardData,
@@ -14,19 +14,34 @@ from ..schemas import (
     WalletResponse,
 )
 from ..services.statuses import map_kyc_status_to_public
+from ..models import User, Wallet, Transaction, Contact, AIDecision
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
 @router.get("/", response_model=DashboardData)
 async def get_dashboard_summary(
-    current_user: User = Depends(require_active_user),
-    db: Session = Depends(get_db),
-) -> DashboardData:
-    wallets_stmt = select(Wallet).where(Wallet.user_id == current_user.user_id)
-    wallets = db.execute(wallets_stmt).scalars().all()
-    wallet = wallets[0] if wallets else None
-    user_wallet_ids = [w.wallet_id for w in wallets]
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # 1. Get Wallet
+    # Assuming user has at least one wallet. If not, return None or create one?
+    # Auth register creates one, so it should exist.
+    stmt = select(Wallet).where(Wallet.user_id == current_user.user_id) # Changed wallet_stmt to stmt
+    wallet = db.execute(stmt).scalars().first()
+    
+    wallet_data = None
+    if wallet:
+        wallet_data = { # Changed to dict as per new DashboardData schema
+            "wallet_id": wallet.wallet_id,
+            "balance": float(wallet.balance),
+            "currency": wallet.currency,
+            "kyc_status": wallet.kyc_status
+        }
+    
+    # 2. Get Recent Transactions (Last 5)
+    # Fetch where user is initiator OR user owns source/destination wallet
+    user_wallet_ids = [w.wallet_id for w in current_user.wallets] if current_user.wallets else []
 
     wallet_data = (
         WalletResponse(
@@ -61,6 +76,13 @@ async def get_dashboard_summary(
             "Virement recu" if is_incoming else "Virement externe"
         )
 
+        # Récupérer les raisons de décision IA
+        reasons_list = None
+        decision_stmt = select(AIDecision).where(AIDecision.transaction_id == tx.transaction_id).order_by(AIDecision.created_at.desc())
+        decision = db.execute(decision_stmt).scalars().first()
+        if decision and decision.reasons:
+            reasons_list = [r.strip() for r in decision.reasons.split(",") if r.strip()]
+
         tx_list.append(
             TransactionResponseLite(
                 transaction_id=tx.transaction_id,
@@ -71,6 +93,7 @@ async def get_dashboard_summary(
                 status=map_kyc_status_to_public(tx.kyc_status),
                 recipient_name=display_name,
                 created_at=tx.created_at,
+                reasons=reasons_list
             )
         )
 

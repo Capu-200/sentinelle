@@ -14,17 +14,21 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import httpx
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from sqlalchemy.exc import SQLAlchemyError, text
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import SQLModel, Session, select
 
 from app.database import engine, get_db
 from .auth import get_current_user, require_active_user
 from .config import get_settings
-from .kafka_producer import publish_transaction_request
 from .models import AIDecision, Transaction, User, Wallet, WalletLedger, Contact
+from .worker_ia import build_enriched_payload, score_with_retry
+from .services.rule_engine import evaluate_transaction
+from .services.transactions import save_ai_decision, apply_decision_to_transaction
+from .database import SessionLocal
 from .routers import auth, dashboard, contacts
 from .schemas import TransactionResponseLite
 from .services.statuses import map_kyc_status_to_public
@@ -93,183 +97,67 @@ class TransactionCreateResponse(BaseModel):
     transaction_id: str
     status: str
     message: str
+    risk_score: Optional[float] = 0.0
+    decision: Optional[str] = "PENDING"
+    reasons: Optional[List[str]] = []
+    model_version: Optional[str] = "unknown"
 
 
-# ========== FONCTIONS UTILITAIRES ==========
-
-async def enrich_transaction_with_historical_features(
-    transaction: dict,
-    db_session
-) -> dict:
-    """
-    Enrichit une transaction avec les features historiques depuis la DB.
-    
-    Pour l'instant, version simplifiée. À compléter avec les vraies requêtes SQL.
-    """
-    source_wallet_id = transaction.get("source_wallet_id")
-    created_at = transaction.get("created_at", datetime.utcnow().isoformat())
-    
-    # Features historiques basiques (à compléter avec les vraies requêtes)
-    historical_features = {
-        # Exemples - à remplacer par de vraies requêtes SQL
-        "avg_amount_30d": None,
-        "tx_last_10min": 0,
-        "is_new_beneficiary": False,
-        "user_country_history": [],
-        "blocked_tx_last_24h": 0,
-        # Features ML (à compléter)
-        "src_tx_count_out_1h": 0,
-        "src_tx_amount_mean_out_7d": None,
-        "is_new_destination_30d": False,
-    }
-    
-    # Features transactionnelles basiques
-    # Features transactionnelles complètes (alignées sur la doc ML Engine)
-    current_dt = datetime.fromisoformat(transaction.get("created_at") or datetime.utcnow().isoformat())
-    amount_val = float(transaction.get("amount", 0))
-    
-    transactional_features = {
-        "amount": amount_val,
-        "log_amount": __import__("math").log(1 + amount_val),
-        "currency_is_pyc": 1 if transaction.get("currency") == "PYC" else 0, # Force integer 1/0
-        "direction_outgoing": 1 if str(transaction.get("direction")).upper() == "OUTGOING" else 0,
-        "hour_of_day": current_dt.hour,
-        "day_of_week": current_dt.weekday(), # 0=Monday
-        "transaction_type_TRANSFER": 1 # Hardcoded for now as we only do transfers
-    }
-    
-    # Récupérer le solde réel du wallet source
-    source_wallet_balance = None
-    if source_wallet_id:
-        wallet = db_session.get(Wallet, source_wallet_id)
-        if wallet:
-            source_wallet_balance = float(wallet.balance)
-
-    # Construire la transaction enrichie (Structure Root attendue par ML Engine V2)
-    # Injecter les features DANS l'objet transaction (Format requis par ML Engine)
-    transaction["features"] = {
-        "transactional": transactional_features,
-        "historical": historical_features,
-    }
-
-    # Construire la transaction enrichie (Structure Root attendue par ML Engine V2)
-    enriched = {
-        "schema_version": "1.0.0",
-        "transaction": transaction,
-        "context": {
-            "source_wallet": {
-                "balance": source_wallet_balance, 
-                "status": "ACTIVE"
-            },
-            "user": {"status": "ACTIVE", "risk_level": "LOW"},
-            "destination_wallet": {"status": "ACTIVE"},
-        }
-    }
-    
-    return enriched
-
-
-async def call_ml_engine(enriched_transaction: dict) -> dict:
-    """
-    Appelle le ML Engine pour scorer la transaction.
-    """
+def process_transaction_background(transaction_id: str, payload: dict):
+    """Processes the transaction asynchronously without Kafka (Cloud Run friendly)."""
+    logger.info("Background processing started for tx=%s", transaction_id)
+    db = SessionLocal()
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            # Send the enriched structure directly as root payload
-            payload = enriched_transaction
-            
-            tx_id = enriched_transaction.get("transaction", {}).get("transaction_id", "unknown")
-            logger.info(f"ML_ENGINE_REQ: Transaction {tx_id} - Sending payload to {ML_ENGINE_URL}")
-            # logger.debug(f"Payload: {payload}") # Uncomment for full payload debug
-            
-            response = await client.post(
-                f"{ML_ENGINE_URL}/score",
-                json=payload,
-            )
-            
-            if response.status_code != 200:
-                logger.error(f"ML_ENGINE_ERROR: Status {response.status_code} - Body: {response.text}")
-                
-            response.raise_for_status()
-            result = response.json()
-            
-            decision = result.get("decision", "UNKNOWN")
-            reasons = result.get("reasons", [])
-            logger.info(f"ML_ENGINE_RESP: Transaction {tx_id} - Decision: {decision} - Reasons: {reasons}")
-            
-            return result
-    except httpx.HTTPError as e:
-        # Fallback for demo/dev if ML Engine is down -> FAIL CLOSED (BLOCK)
-        logger.critical(f"ML_ENGINE_FAILURE: Network Error: {e}. Defaulting to BLOCK.")
-        return {
-            "risk_score": 1.0,
-            "decision": "BLOCK",
-            "reasons": ["ML_ENGINE_UNAVAILABLE"],
-            "model_version": "fallback"
-        }
-    except Exception as e:
-        logger.critical(f"ML_ENGINE_FAILURE: Unexpected Error: {e}. Defaulting to BLOCK.")
-        return {
-            "risk_score": 1.0,
-            "decision": "BLOCK",
-            "reasons": ["ML_ENGINE_UNAVAILABLE"],
-            "model_version": "fallback"
-        }
+        enriched = build_enriched_payload(payload)
+        
+        # 1. ML Scoring
+        try:
+            result = score_with_retry(enriched)
+            ml_risk_score = float(result.get("risk_score", 0.0))
+            ml_reasons = result.get("reasons", [])
+            ml_decision = result.get("decision", "APPROVE")
+            ml_model_version = result.get("model_version", "unknown")
+        except Exception as exc:
+            logger.exception("ML scoring failed for tx=%s", transaction_id)
+            ml_risk_score = 0.5
+            ml_reasons = [f"WORKER_ERROR: {exc}"]
+            ml_decision = "REVIEW"
+            ml_model_version = "fallback"
 
-
-
-async def save_ai_decision(
-    transaction_id: str,
-    scoring_result: dict,
-    db_session
-) -> None:
-    """
-    Sauvegarde la décision AI dans la table ai_decisions.
-    """
-    decision_id = str(uuid.uuid4())
-    
-    db_session.execute(
-            text("""
-                INSERT INTO ai_decisions (
-                    decision_id,
-                    transaction_id,
-                    fraud_score,
-                    decision,
-                    reasons,
-                    model_version,
-                    latency_ms,
-                    threshold_used,
-                    features_snapshot,
-                    created_at
-                ) VALUES (
-                    :decision_id,
-                    :transaction_id,
-                    :fraud_score,
-                    :decision,
-                    :reasons,
-                    :model_version,
-                    :latency_ms,
-                    :threshold_used,
-                    :features_snapshot,
-                    :created_at
-                )
-            """),
-            {
-                "decision_id": decision_id,
-                "transaction_id": transaction_id,
-                "fraud_score": scoring_result.get("risk_score", 0.0),
-                "decision": scoring_result.get("decision", "APPROVE"),
-                "reasons": ", ".join(scoring_result.get("reasons", [])),
-                "model_version": scoring_result.get("model_version", "unknown"),
-                "latency_ms": None,  # À calculer si disponible
-                "threshold_used": None,  # À récupérer si disponible
-                "features_snapshot": None,  # JSONB - à ajouter si nécessaire
-                "created_at": datetime.utcnow(),
-            }
+        # 2. Rule Engine
+        evaluation = evaluate_transaction(
+            tx_context=payload,
+            ml_risk_score=ml_risk_score,
+            ml_reasons=ml_reasons,
+            db=db,
         )
-    # Note: commit is handled by caller or dependency injection usually, 
-    # but here we are in a route handler, so we can commit.
-    # However, if save_transaction also commits, we should be careful.
+        final_decision = evaluation.decision
+        final_score = evaluation.combined_score
+        all_reasons = evaluation.all_reasons
+        
+        decision_payload = {
+            "transaction_id": transaction_id,
+            "fraud_score": final_score,
+            "decision": final_decision,
+            "reasons": all_reasons,
+            "model_version": ml_model_version,
+            "features_snapshot": enriched["transaction"]["features"],
+        }
+        
+        # 3. Apply changes
+        tx = db.get(Transaction, transaction_id)
+        if tx:
+            save_ai_decision(db, transaction_id, decision_payload)
+            apply_decision_to_transaction(db, tx, decision_payload)
+            db.commit()
+            logger.info("Background processing complete for tx=%s. Final decision: %s", transaction_id, final_decision)
+        else:
+            logger.error("Transaction %s not found in DB during background processing.", transaction_id)
+    except Exception as exc:
+        logger.exception("Background processing failed for tx=%s", transaction_id)
+        db.rollback()
+    finally:
+        db.close()
 
 
 class DecisionDebugResponse(BaseModel):
@@ -326,6 +214,7 @@ def _resolve_destination_wallet(db: Session, recipient_email: Optional[str]) -> 
 )
 async def create_transaction(
     transaction_req: TransactionCreateRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(require_active_user),
     db: Session = Depends(get_db),
 ):
@@ -391,23 +280,20 @@ async def create_transaction(
     }
 
     try:
-        publish_transaction_request(event_payload)
-    except RuntimeError:
-        logger.exception("Kafka publish failed for tx=%s", transaction_id)
-        db.rollback()
-        raise HTTPException(status_code=503, detail="Kafka indisponible")
-
-    try:
         db.commit()
     except SQLAlchemyError:
         db.rollback()
-        logger.exception("DB commit failed after Kafka publish for tx=%s", transaction_id)
+        logger.exception("DB commit failed for tx=%s", transaction_id)
         raise HTTPException(
             status_code=500,
             detail="Erreur lors de l'enregistrement de la transaction. Merci de réessayer.",
         )
     db.refresh(new_tx)
-    logger.info("Transaction %s enqueued for scoring", transaction_id)
+    
+    # Process asynchronously using FastAPI BackgroundTasks instead of Kafka
+    background_tasks.add_task(process_transaction_background, transaction_id, event_payload)
+    
+    logger.info("Transaction %s enqueued for background processing", transaction_id)
     return TransactionCreateResponse(
         transaction_id=transaction_id,
         status=map_kyc_status_to_public(new_tx.kyc_status),
@@ -439,7 +325,8 @@ async def get_transactions(
     )
     transactions = db.execute(stmt).scalars().all()
 
-    results: List[TransactionResponseLite] = []
+
+    result = []
     for tx in transactions:
         is_incoming = tx.destination_wallet_id in user_wallet_ids and (
             not tx.source_wallet_id or tx.source_wallet_id not in user_wallet_ids
@@ -461,10 +348,25 @@ async def get_transactions(
                 if dest_user:
                     destination_country = dest_user.country_home
                     recipient_email = dest_user.email
+        
+        # Nom du destinataire (Logique améliorée pour éviter doublon commentaire)
+        # Priorité: 1. Description (sauf si c'est un commentaire long) 2. Email 3. Inconnu
+        # Si description == comment, on évite de l'utiliser comme Nom
+        
+        recipient_name = "Destinataire Inconnu"
+        if recipient_email:
+             recipient_name = recipient_email
+        elif tx.description and len(tx.description) < 30: # Use description as name only if short-ish
+             recipient_name = tx.description
+        
+        # Récupérer les raisons (fraud rules)
+        reasons_list = None
+        decision_stmt = select(AIDecision).where(AIDecision.transaction_id == tx.transaction_id).order_by(AIDecision.created_at.desc())
+        decision = db.execute(decision_stmt).scalars().first()
+        if decision and decision.reasons:
+            reasons_list = [r.strip() for r in decision.reasons.split(",") if r.strip()]
 
-        recipient_name = tx.description or recipient_email or "Destinataire Inconnu"
-
-        results.append(
+        result.append(
             TransactionResponseLite(
                 transaction_id=tx.transaction_id,
                 amount=float(tx.amount),
@@ -478,6 +380,7 @@ async def get_transactions(
                 source_country=source_country,
                 destination_country=destination_country,
                 comment=tx.description,
+                reasons=reasons_list
             )
         )
 
@@ -550,123 +453,6 @@ async def list_decisions(
             )
         )
     return result
-    """
-    Crée une transaction et la score via le ML Engine.
-    Met à jour les soldes si APPROVE.
-    """
-    transaction_id = transaction_req.transaction_id or str(uuid.uuid4())
-    current_time = datetime.utcnow()
-    
-    # 0. Résolution du Wallet de Destination (si email fourni)
-    destination_wallet_id = transaction_req.destination_wallet_id
-    if not destination_wallet_id and transaction_req.recipient_email:
-        # Chercher l'utilisateur par email (Normalisé)
-        dest_email = transaction_req.recipient_email.lower()
-        dest_user_stmt = select(User).where(User.email == dest_email)
-        dest_user = db.execute(dest_user_stmt).scalars().first()
-        
-        if dest_user:
-            # Chercher son wallet (le premier pour l'instant)
-            dest_wallet_stmt = select(Wallet).where(Wallet.user_id == dest_user.user_id)
-            dest_wallet = db.execute(dest_wallet_stmt).scalars().first()
-            if dest_wallet:
-                destination_wallet_id = dest_wallet.wallet_id
-
-    # Self-transfer check
-    if destination_wallet_id and destination_wallet_id == transaction_req.source_wallet_id:
-        raise HTTPException(status_code=400, detail="Virement impossible vers le même compte.")
-
-
-
-    # 1. Vérification Solde (Pre-check)
-    if transaction_req.direction == "OUTGOING":
-        source_wallet = db.get(Wallet, transaction_req.source_wallet_id)
-        if not source_wallet:
-             raise HTTPException(status_code=404, detail="Wallet source introuvable")
-        if source_wallet.balance < Decimal(str(transaction_req.amount)):
-             raise HTTPException(status_code=400, detail="Solde insuffisant")
-
-    # 2. Sauvegarder la Transaction (PENDING)
-    new_tx = Transaction(
-        transaction_id=transaction_id,
-        amount=Decimal(str(transaction_req.amount)),
-        currency=transaction_req.currency,
-        source_wallet_id=transaction_req.source_wallet_id,
-        destination_wallet_id=destination_wallet_id, # Utilisation de l'ID résolu
-        transaction_type=transaction_req.transaction_type,
-        direction=transaction_req.direction,
-        country=transaction_req.country,
-        city=transaction_req.city,
-        description=transaction_req.description,
-        initiator_user_id=transaction_req.initiator_user_id,
-        created_at=current_time,
-        kyc_status="PENDING"
-    )
-    db.add(new_tx)
-    # On commit ici pour avoir l'ID transaction dispo pour les logs, 
-    # mais attention si crash après -> transaction PENDING orpheline (acceptable)
-    db.commit() 
-    db.refresh(new_tx)
-    
-    # 3. Enrichissement & Scoring IA
-    transaction_dict = transaction_req.dict()
-    transaction_dict["transaction_id"] = transaction_id
-    transaction_dict["created_at"] = transaction_dict.get("created_at") or current_time.isoformat()
-    
-    enriched_transaction = await enrich_transaction_with_historical_features(transaction_dict, db)
-    scoring_result = await call_ml_engine(enriched_transaction)
-    
-    decision = scoring_result.get("decision", "APPROVE")
-    new_tx.kyc_status = "VALIDATED" if decision == "APPROVE" else "REJECTED"
-    if decision == "REVIEW":
-        new_tx.kyc_status = "REVIEW"
-    
-    db.add(new_tx)
-    
-    # 4. Sauvegarde Décision IA
-    try:
-        await save_ai_decision(transaction_id, scoring_result, db)
-    except Exception as e:
-        print(f"Erreur save_ai_decision: {e}")
-
-    # 5. Exécution Financière (Ledger) si VALIDATED
-    if new_tx.kyc_status == "VALIDATED":
-        try:
-            # Débit Source
-            if new_tx.direction == "OUTGOING":
-                execute_balance_movement(
-                    db, 
-                    wallet_id=new_tx.source_wallet_id, 
-                    amount=transaction_req.amount, 
-                    transaction_id=transaction_id, 
-                    entry_type="DEBIT"
-                )
-            
-            # Crédit Destination (si wallet interne)
-            if new_tx.destination_wallet_id:
-                execute_balance_movement(
-                    db,
-                    wallet_id=new_tx.destination_wallet_id,
-                    amount=transaction_req.amount,
-                    transaction_id=transaction_id,
-                    entry_type="CREDIT"
-                )
-                
-        except ValueError as e:
-            # Rollback transaction status if ledger fails
-            new_tx.kyc_status = "FAILED"
-            db.add(new_tx)
-            raise HTTPException(status_code=400, detail=str(e))
-    
-    db.commit()
-    
-    return TransactionResponse(
-        transaction_id=transaction_id,
-        risk_score=scoring_result.get("risk_score", 0.0),
-        decision=decision,
-        reasons=scoring_result.get("reasons", []),
-        model_version=scoring_result.get("model_version", "unknown"),
-    )
 
 
 class CommentUpdate(BaseModel):

@@ -17,4 +17,5 @@ export interface Transaction {
     destinationCountry?: string; // Code pays ISO (ex: "ES")
     comment?: string; // Commentaire utilisateur
     recipientIban?: string; // IBAN du destinataire si disponible
+    reasons?: string[]; // Raisons du blocage / mise en revue (Depuis ML ou rules)
 }

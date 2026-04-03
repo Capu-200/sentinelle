@@ -1,40 +1,53 @@
+"""
+Application settings loaded from environment variables.
+"""
+import os
 from functools import lru_cache
-from pathlib import Path
 
-from pydantic import BaseSettings, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """Central application configuration loaded from environment variables."""
-
-    log_level: str = Field("INFO", env="LOG_LEVEL")
-
+    # Database
     database_url: str = Field(
-        "postgresql+psycopg2://postgres:postgres@localhost:5432/postgres",
-        env="DATABASE_URL",
+        default="postgresql+psycopg2://fraud_user:fraud_pwd@localhost:5432/fraud_db",
+        alias="DATABASE_URL",
     )
 
+    # Kafka
     kafka_bootstrap_servers: str = Field(
-        "localhost:9092",
-        env="KAFKA_BOOTSTRAP_SERVERS",
+        default="localhost:9092",
+        alias="KAFKA_BOOTSTRAP_SERVERS",
     )
     kafka_topic_requests: str = Field(
-        "transaction.requests",
-        env="KAFKA_TOPIC_REQUESTS",
+        default="transaction.requests",
+        alias="KAFKA_TOPIC_REQUESTS",
+    )
+    kafka_topic_decisions: str = Field(
+        default="transaction.decisions",
+        alias="KAFKA_TOPIC_DECISIONS",
     )
 
-    ml_engine_health_url: str = Field(
-        "http://localhost:8001/health",
-        env="ML_ENGINE_HEALTH_URL",
+    # ML Engine
+    ml_engine_url: str = Field(
+        default="https://sentinelle-ml-engine-v2-ntqku76mya-ew.a.run.app",
+        alias="ML_ENGINE_URL",
     )
+    ml_engine_health_url: str = Field(
+        default="https://sentinelle-ml-engine-v2-ntqku76mya-ew.a.run.app/health",
+        alias="ML_ENGINE_HEALTH_URL",
+    )
+
+    # Logging
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
     class Config:
-        env_file = Path(__file__).resolve().parents[2] / ".env"
-        env_file_encoding = "utf-8"
+        env_file = ".env"
+        extra = "ignore"
+        populate_by_name = True
 
 
 @lru_cache()
 def get_settings() -> Settings:
-    """Return cached Settings instance to avoid repeated env parsing."""
     return Settings()
-
