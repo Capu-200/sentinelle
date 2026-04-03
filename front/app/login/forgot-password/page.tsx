@@ -3,8 +3,7 @@
 import { useActionState, useEffect } from 'react';
 import { useFormStatus } from 'react-dom';
 import Link from 'next/link';
-import { GlassCard } from '@/components/ui/glass-card';
-import { Mail, ArrowRight, Loader2, ArrowLeft, CheckCircle } from 'lucide-react';
+
 import { forgotPasswordAction, AuthActionState } from '@/app/actions/auth';
 import toast from 'react-hot-toast';
 
