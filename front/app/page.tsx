@@ -91,30 +91,16 @@ export default async function Home() {
     } catch(e) {}
   }
 
-  // Fausse une demande reçue si aucune n'existe pour montrer aux utilisateurs les deux flux
-  if (!mockRequests.find((r: any) => r.id === "fake-req-001")) {
-      mockRequests.push({
-          id: "fake-req-001",
-          to: "john.doe@payon.app",
-          from_name: "Service PayOn",
-          amount: 50.00,
-          comment: "Pour le test d'intégration !",
-          status: "PENDING",
-          direction: "RECEIVED",
-          date: new Date().toISOString()
-      });
-  }
-
   const { user, wallet, recent_transactions, contacts } = dashboardData;
 
   const userEmail = user.email;
 
   // IMPORTANT: Re-évaluer la direction dynamiquement pour que les deux côtés voient la vue orientée correctement!
   mockRequests = mockRequests
-    .filter((r: any) => r.to === userEmail || r.from === userEmail || r.id === "fake-req-001")
+    .filter((r: any) => r.to === userEmail || r.from === userEmail)
     .map((r: any) => {
         // Si la demande était adressée à l'utilisateur actuel, elle est REÇUE par eux
-        const isReceived = r.to === userEmail || (r.id === "fake-req-001" && r.direction === "RECEIVED");
+        const isReceived = r.to === userEmail;
         return {
             ...r,
             direction: isReceived ? "RECEIVED" : "SENT"

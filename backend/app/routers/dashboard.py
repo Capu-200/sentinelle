@@ -4,10 +4,10 @@ from typing import List, Optional
 from pydantic import BaseModel # Added for DashboardData definition
 
 from ..database import get_db
-from ..models import User, Wallet, Transaction, Contact
 from ..auth import require_active_user, get_current_user
 from ..schemas import DashboardData, UserProfileResponse, WalletResponse, TransactionResponseLite
 from ..services.statuses import map_kyc_status_to_public
+from ..models import User, Wallet, Transaction, Contact, AIDecision
 
 router = APIRouter(
     prefix="/dashboard",
@@ -22,9 +22,7 @@ class DashboardData(BaseModel):
     contacts: List[dict] # Added field
 
 @router.get("/", response_model=DashboardData)
-def get_dashboard_summary(
-    current_user: User = Depends(require_active_user),
-async def get_dashboard_summary( # Added async
+async def get_dashboard_summary(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -76,6 +74,13 @@ async def get_dashboard_summary( # Added async
         else:
              display_name = f"Virement reçu" # Could be improved with Sender Name lookup
 
+        # Récupérer les raisons de décision IA
+        reasons_list = None
+        decision_stmt = select(AIDecision).where(AIDecision.transaction_id == tx.transaction_id).order_by(AIDecision.created_at.desc())
+        decision = db.execute(decision_stmt).scalars().first()
+        if decision and decision.reasons:
+            reasons_list = [r.strip() for r in decision.reasons.split(",") if r.strip()]
+
         tx_list.append(
             TransactionResponseLite(
                 transaction_id=tx.transaction_id,
@@ -84,10 +89,9 @@ async def get_dashboard_summary( # Added async
                 transaction_type=tx.transaction_type,
                 direction=direction,
                 status=map_kyc_status_to_public(tx.kyc_status),
-                recipient_name=tx.description or "Unknown Data",
-                status=tx.kyc_status,
-                recipient_name=display_name, # Updated to use display_name
-                created_at=tx.created_at
+                recipient_name=display_name,
+                created_at=tx.created_at,
+                reasons=reasons_list
             )
         )
 

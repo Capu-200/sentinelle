@@ -90,6 +90,7 @@ export async function createTransferAction(prevState: any, formData: FormData) {
         const res = await fetch(`${API_URL}/transactions`, {
             method: "POST",
             headers: {
+                "Authorization": `Bearer ${token.value}`,
                 "Content-Type": "application/json",
             },
             body: JSON.stringify(payload),

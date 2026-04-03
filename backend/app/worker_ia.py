@@ -9,23 +9,19 @@ from typing import Any, Dict, Optional
 import requests
 from kafka import KafkaConsumer, KafkaProducer
 from kafka.errors import KafkaError
+from sqlmodel import Session
 
+from .database import SessionLocal
+from .services.rule_engine import evaluate_transaction
+from .config import get_settings
 
-def _env(key: str, default: str) -> str:
-    value = os.getenv(key)
-    if value:
-        return value
-    logging.warning("Env var %s missing. Falling back to %s", key, default)
-    return default
+settings = get_settings()
 
-
-KAFKA_BOOTSTRAP = _env("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
-TOPIC_IN = _env("KAFKA_TOPIC_IN", "transaction.requests")
-TOPIC_OUT = _env("KAFKA_TOPIC_OUT", "transaction.decisions")
-GROUP_ID = _env("KAFKA_GROUP_ID", "payon-ia-worker")
-ML_ENGINE_URL = _env(
-    "ML_ENGINE_URL", "https://sentinelle-ml-engine-ntqku76mya-ew.a.run.app/score"
-)
+KAFKA_BOOTSTRAP = settings.kafka_bootstrap_servers
+TOPIC_IN = settings.kafka_topic_requests
+TOPIC_OUT = settings.kafka_topic_decisions
+ML_ENGINE_URL = settings.ml_engine_url
+GROUP_ID = os.getenv("KAFKA_GROUP_ID", "payon-ia-worker")
 ML_TIMEOUT_S = int(os.getenv("ML_TIMEOUT_S", "10"))
 ML_MAX_RETRIES = int(os.getenv("ML_MAX_RETRIES", "3"))
 ML_RETRY_BACKOFF_S = float(os.getenv("ML_RETRY_BACKOFF_S", "1.0"))
@@ -129,8 +125,9 @@ def build_enriched_payload(tx: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def call_ml_engine(payload: Dict[str, Any]) -> Dict[str, Any]:
+    url = f"{ML_ENGINE_URL.rstrip('/')}/score"
     response = requests.post(
-        ML_ENGINE_URL,
+        url,
         json=payload,
         timeout=ML_TIMEOUT_S,
         headers={"Content-Type": "application/json"},
@@ -213,23 +210,76 @@ def process_message(raw_message: bytes, producer: KafkaProducer) -> bool:
     features_snapshot = enriched["transaction"]["features"]
     context_snapshot = enriched.get("context", {})
 
+    # ---- Step 1: ML Engine scoring ----
+    ml_risk_score = 0.0
+    ml_reasons: list[str] = []
+    ml_decision = "APPROVE"
+    ml_model_version = "unknown"
+
     try:
         result = score_with_retry(enriched)
-        decision_payload = {
-            "transaction_id": tx_id,
-            "fraud_score": result.get("risk_score"),
-            "decision": result.get("decision"),
-            "reasons": result.get("reasons", []),
-            "model_version": result.get("model_version"),
-            "features_snapshot": features_snapshot,
-            "context": context_snapshot,
-            "created_at": now_iso(),
-        }
+        ml_risk_score = safe_float(result.get("risk_score"), 0.0)
+        ml_reasons = result.get("reasons", [])
+        ml_decision = result.get("decision", "APPROVE")
+        ml_model_version = result.get("model_version", "unknown")
     except Exception as exc:
         logger.exception("ML scoring failed for tx=%s", tx_id)
-        decision_payload = build_fallback(
-            tx_id, features_snapshot, context_snapshot, f"WORKER_ERROR: {exc}"
-        )
+        ml_risk_score = 0.5
+        ml_reasons = [f"WORKER_ERROR: {exc}"]
+        ml_decision = "REVIEW"
+        ml_model_version = "fallback"
+
+    # ---- Step 2: Rule Engine evaluation (with DB) ----
+    final_decision = ml_decision
+    final_score = ml_risk_score
+    all_reasons = list(ml_reasons)
+
+    try:
+        db: Session = SessionLocal()
+        try:
+            evaluation = evaluate_transaction(
+                tx_context=payload,
+                ml_risk_score=ml_risk_score,
+                ml_reasons=ml_reasons,
+                db=db,
+            )
+            final_decision = evaluation.decision
+            final_score = evaluation.combined_score
+            all_reasons = evaluation.all_reasons
+
+            # Commit user trust_score / risk_level updates
+            db.commit()
+
+            logger.info(
+                "RULE ENGINE COMPLETE tx=%s ml_decision=%s final_decision=%s "
+                "ml_score=%.4f rule_score=%.4f combined=%.4f triggered=%d rules",
+                tx_id,
+                ml_decision,
+                final_decision,
+                ml_risk_score,
+                evaluation.rule_score,
+                evaluation.combined_score,
+                len(evaluation.triggered_rules),
+            )
+        except Exception:
+            db.rollback()
+            logger.exception("Rule engine failed for tx=%s, using ML decision only", tx_id)
+        finally:
+            db.close()
+    except Exception:
+        logger.exception("Cannot open DB session for rule engine, using ML decision only")
+
+    # ---- Step 3: Build and publish decision ----
+    decision_payload = {
+        "transaction_id": tx_id,
+        "fraud_score": final_score,
+        "decision": final_decision,
+        "reasons": all_reasons,
+        "model_version": ml_model_version,
+        "features_snapshot": features_snapshot,
+        "context": context_snapshot,
+        "created_at": now_iso(),
+    }
 
     return publish_decision(producer, decision_payload)
 
@@ -268,4 +318,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

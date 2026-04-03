@@ -39,7 +39,8 @@ async function getTransactions(): Promise<Transaction[]> {
             sourceCountry: t.source_country,           // Directement depuis le backend
             destinationCountry: t.destination_country, // Directement depuis le backend
             comment: t.comment,                        // Commentaire depuis le backend
-            recipientIban: t.recipient_iban            // IBAN si disponible
+            recipientIban: t.recipient_iban,           // IBAN si disponible
+            reasons: t.reasons                         // Raisons du blocage IA
         }));
 
     } catch (error) {

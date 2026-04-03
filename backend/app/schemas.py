@@ -49,6 +49,7 @@ class TransactionResponseLite(BaseModel):
     source_country: Optional[str] = None
     destination_country: Optional[str] = None
     comment: Optional[str] = None
+    reasons: Optional[List[str]] = None
 
 class UserProfileResponse(BaseModel):
     user_id: str

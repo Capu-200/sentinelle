@@ -106,7 +106,8 @@ def save_ai_decision(
         fraud_score = 0.0
     decision_row.fraud_score = Decimal(str(fraud_score))
     decision_row.decision = decision_payload.get("decision", "REVIEW")
-    decision_row.reasons = ", ".join(reasons)
+    reasons_str = ", ".join(reasons)
+    decision_row.reasons = reasons_str[:97] + "..." if len(reasons_str) > 100 else reasons_str
     decision_row.model_version = decision_payload.get("model_version", "unknown")
     decision_row.features_snapshot = decision_payload.get("features_snapshot")
     decision_row.created_at = datetime.utcnow()
