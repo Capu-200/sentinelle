@@ -6,13 +6,14 @@ import { useRouter } from 'next/navigation';
 import { GlassCard } from '@/components/ui/glass-card';
 import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2, User, Globe } from 'lucide-react';
 import Link from 'next/link';
-import { registerAction } from '../actions/auth';
+import { registerAction, AuthActionState } from '../actions/auth';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 
-const initialState = {
+const initialState: AuthActionState = {
     error: '',
     success: false,
+    message: '',
 };
 
 function SubmitButton() {
@@ -71,7 +72,7 @@ export default function RegisterPage() {
                     <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">
                         Créer un compte
                     </h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Rejoignez PayOn dès aujourd'hui</p>
+                    <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Rejoignez PayOn dès aujourd&apos;hui</p>
                 </div>
 
                 <GlassCard className="p-8 backdrop-blur-xl border-white/20 dark:border-white/10 shadow-2xl">

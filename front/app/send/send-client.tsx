@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { mockContacts } from '@/lib/mock-data';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
-import Skeleton from '@/components/ui/Skeleton';
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 
 type Step = 'contact' | 'amount' | 'confirm' | 'processing';
@@ -17,7 +16,6 @@ export default function SendPage() {
   const [step, setStep] = useState<Step>(contactParam ? 'amount' : 'contact');
   const [selectedContact, setSelectedContact] = useState<string | null>(contactParam);
   const [amount, setAmount] = useState<string>('');
-  const [isProcessing, setIsProcessing] = useState(false);
   const [transactionStatus, setTransactionStatus] = useState<'validated' | 'verifying' | 'blocked' | null>(null);
   
   const contact = selectedContact ? mockContacts.find(c => c.id === selectedContact) : null;
@@ -34,7 +32,6 @@ export default function SendPage() {
   };
   
   const handleConfirm = async () => {
-    setIsProcessing(true);
     setStep('processing');
     
     // Simuler le traitement par l'IA
@@ -51,8 +48,6 @@ export default function SendPage() {
     } else {
       setTransactionStatus('blocked');
     }
-    
-    setIsProcessing(false);
   };
   
   const handleFinish = () => {
@@ -242,7 +237,7 @@ export default function SendPage() {
               className="w-full"
               onClick={handleFinish}
             >
-              Retour à l'accueil
+              Retour à l&apos;accueil
             </Button>
           </div>
         )}
@@ -258,7 +253,7 @@ export default function SendPage() {
             </p>
             <Card className="text-left">
               <p className="text-sm text-gray-600">
-                Si vous pensez qu'il s'agit d'une erreur, contactez notre support.
+                Si vous pensez qu&apos;il s&apos;agit d&apos;une erreur, contactez notre support.
               </p>
             </Card>
             <Button
@@ -267,7 +262,7 @@ export default function SendPage() {
               className="w-full"
               onClick={handleFinish}
             >
-              Retour à l'accueil
+              Retour à l&apos;accueil
             </Button>
           </div>
         )}

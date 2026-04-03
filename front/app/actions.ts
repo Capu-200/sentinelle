@@ -25,7 +25,9 @@ const ERROR_MESSAGES: Record<string, string> = {
     "ML_ENGINE_UNAVAILABLE": "Vérification de sécurité indisponible. Réessayez plus tard."
 };
 
-export async function createTransferAction(prevState: any, formData: FormData) {
+export type TransferActionState = { success: boolean; message: string; error?: string };
+
+export async function createTransferAction(prevState: TransferActionState, formData: FormData) {
     // ... code truncated for clarity, re-implementing start ...
     const cookieStore = await cookies();
     const token = cookieStore.get("auth-token");
@@ -53,7 +55,7 @@ export async function createTransferAction(prevState: any, formData: FormData) {
                 userId = data.user.user_id;
             }
         }
-    } catch (e) {
+    } catch {
         return { success: false, message: "Erreur de connexion au portefeuille." };
     }
 

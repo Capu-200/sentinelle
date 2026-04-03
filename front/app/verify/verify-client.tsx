@@ -86,7 +86,7 @@ export default function VerifyPage() {
               <div className="flex-1">
                 <div className="font-semibold text-gray-900 text-sm">Analyse par IA en cours...</div>
                 <div className="text-xs text-gray-600">
-                  Temps estimé : moins d'une minute
+                  Temps estimé : moins d&apos;une minute
                 </div>
               </div>
             </div>
@@ -132,7 +132,7 @@ export default function VerifyPage() {
                 className="w-full"
                 onClick={handleHelp}
               >
-                Demander de l'aide
+                Demander de l&apos;aide
               </Button>
             </>
           ) : (
@@ -142,7 +142,7 @@ export default function VerifyPage() {
               className="w-full"
               onClick={() => router.push('/')}
             >
-              Retour à l'accueil
+              Retour à l&apos;accueil
             </Button>
           )}
         </div>
@@ -154,7 +154,7 @@ export default function VerifyPage() {
             <div className="text-sm text-gray-600">
               <p className="font-medium text-gray-900 mb-1">Pourquoi cette vérification ?</p>
               <p>
-                Notre système de sécurité détecte automatiquement les transactions inhabituelles pour protéger votre compte. C'est normal et cela ne prend que quelques secondes.
+                Notre système de sécurité détecte automatiquement les transactions inhabituelles pour protéger votre compte. C&apos;est normal et cela ne prend que quelques secondes.
               </p>
             </div>
           </div>

@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { GlassCard } from '@/components/ui/glass-card';
-import { ArrowLeft, Copy, Check, Share2, QrCode } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { ArrowLeft, Copy, Check, Share2 } from 'lucide-react';
 
 export default function ReceivePage() {
   const [copied, setCopied] = useState(false);
@@ -61,7 +60,7 @@ export default function ReceivePage() {
 
           <div className="space-y-2">
             <h2 className="text-lg font-bold">Jacques Dupont</h2>
-            <p className="text-sm text-muted-foreground">Scannez pour m'envoyer de l'argent</p>
+            <p className="text-sm text-muted-foreground">Scannez pour m&apos;envoyer de l&apos;argent</p>
           </div>
 
           {/* Link & Actions */}
@@ -98,7 +97,7 @@ export default function ReceivePage() {
             </div>
             <div className="flex gap-4">
               <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center font-bold text-sm shrink-0">2</div>
-              <p className="text-sm text-slate-600 dark:text-slate-400 pt-1.5">Il scanne ou clique pour ouvrir l'interface de paiement sécurisée.</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400 pt-1.5">Il scanne ou clique pour ouvrir l&apos;interface de paiement sécurisée.</p>
             </div>
             <div className="flex gap-4">
               <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center font-bold text-sm shrink-0">3</div>

@@ -44,7 +44,7 @@ export default async function RequestPage() {
                 <Link href="/" className="rounded-full p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                     <ArrowLeft className="h-6 w-6" />
                 </Link>
-                <h1 className="text-xl font-bold">Demander de l'argent</h1>
+                <h1 className="text-xl font-bold">Demander de l&apos;argent</h1>
             </div>
 
             <RequestForm 

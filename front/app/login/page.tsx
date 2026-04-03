@@ -6,12 +6,13 @@ import { useRouter } from 'next/navigation';
 import { GlassCard } from '@/components/ui/glass-card';
 import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { loginAction } from '../actions/auth';
+import { loginAction, AuthActionState } from '../actions/auth';
 import toast from 'react-hot-toast';
 
-const initialState = {
+const initialState: AuthActionState = {
     error: '',
     success: false,
+    message: '',
 };
 
 function SubmitButton() {
@@ -125,7 +126,7 @@ export default function LoginPage() {
                         <p className="text-sm text-slate-600 dark:text-slate-400">
                             Pas encore de compte ?{' '}
                             <Link href="/register" className="text-indigo-600 font-bold hover:underline">
-                                S'inscrire
+                                S&apos;inscrire
                             </Link>
                         </p>
                     </div>

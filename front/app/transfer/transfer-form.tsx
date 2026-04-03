@@ -38,7 +38,7 @@ function SubmitButton() {
                 <span className="animate-pulse">Envoi en cours...</span>
             ) : (
                 <>
-                    <span>Confirmer l'envoi</span>
+                    <span>Confirmer l&apos;envoi</span>
                     <Send className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </>
             )}
@@ -57,7 +57,6 @@ export function TransferForm({ contacts: initialContacts }: Props) {
     };
 
     // Utiliser useActionState au lieu de useFormState
-    // @ts-ignore
     const [state, formAction] = useActionState(createTransferAction, initialState);
 
     const [contacts, setContacts] = useState<Contact[]>(initialContacts);

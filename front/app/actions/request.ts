@@ -5,7 +5,21 @@ import { cookies } from "next/headers";
 
 const API_URL = "https://sentinelle-api-backend-ntqku76mya-ew.a.run.app";
 
-export async function createRequestAction(prevState: any, formData: FormData) {
+export type RequestActionState = { success: boolean; message: string };
+
+interface MockRequest {
+    id: string;
+    to: string;
+    from: string;
+    from_name: string;
+    amount: number;
+    comment: string;
+    status: string;
+    direction: string;
+    date: string;
+}
+
+export async function createRequestAction(prevState: RequestActionState, formData: FormData) {
     const amount = formData.get("amount");
     const recipient = formData.get("recipient") as string;
     const comment = formData.get("comment") as string;
@@ -27,9 +41,9 @@ export async function createRequestAction(prevState: any, formData: FormData) {
 
     const cookieStore = await cookies();
     const requestsCookie = cookieStore.get("mock_requests");
-    let requests: any[] = [];
+    let requests: MockRequest[] = [];
     if (requestsCookie) {
-        try { requests = JSON.parse(requestsCookie.value); } catch (e) {}
+        try { requests = JSON.parse(requestsCookie.value); } catch { }
     }
 
     const newRequest = {
@@ -56,13 +70,13 @@ export async function actionRespondRequest(id: string, action: 'ACCEPT' | 'DECLI
     const token = cookieStore.get("auth-token");
     const requestsCookie = cookieStore.get("mock_requests");
 
-    let requests: any[] = [];
+    let requests: MockRequest[] = [];
     if (requestsCookie) {
-        try { requests = JSON.parse(requestsCookie.value); } catch (e) {}
+        try { requests = JSON.parse(requestsCookie.value); } catch { }
     }
 
     // Find the request (including the fake demo one)
-    let req = requests.find((r: any) => r.id === id);
+    let req = requests.find((r: MockRequest) => r.id === id);
     if (!req && id === "fake-req-001") {
         req = {
             id: "fake-req-001",
@@ -114,14 +128,13 @@ export async function actionRespondRequest(id: string, action: 'ACCEPT' | 'DECLI
                     });
                 }
             }
-        } catch (e) {
+        } catch {
             // Silent fail – still mark as accepted in mock
-            console.error("Transfer on accept failed:", e);
         }
     }
 
     // Update mock cookie status
-    const idx = requests.findIndex((r: any) => r.id === id);
+    const idx = requests.findIndex((r: MockRequest) => r.id === id);
     if (idx !== -1) {
         requests[idx].status = action === 'ACCEPT' ? 'ACCEPTED' : 'DECLINED';
     }

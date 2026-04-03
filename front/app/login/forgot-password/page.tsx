@@ -6,6 +6,8 @@ import Link from 'next/link';
 
 import { forgotPasswordAction, AuthActionState } from '@/app/actions/auth';
 import toast from 'react-hot-toast';
+import { Loader2, ArrowRight, ArrowLeft, CheckCircle, Mail } from 'lucide-react';
+import { GlassCard } from '@/components/ui/glass-card';
 
 const initialState: AuthActionState = { error: '', success: false, message: '' };
 

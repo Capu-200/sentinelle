@@ -1,5 +1,4 @@
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { ActivityList } from "@/components/activity/activity-list";
@@ -29,18 +28,31 @@ async function getTransactions(): Promise<Transaction[]> {
 
         const data = await res.json();
 
-        return data.map((t: any) => ({
+        return data.map((t: {
+            transaction_id: string;
+            amount: number;
+            recipient_name?: string;
+            recipient_email?: string;
+            status: string;
+            created_at: string;
+            direction: 'INCOMING' | 'OUTGOING';
+            source_country?: string;
+            destination_country?: string;
+            comment?: string;
+            recipient_iban?: string;
+            reasons?: string[];
+        }) => ({
             id: t.transaction_id,
             amount: t.amount,
             recipient: t.recipient_name || t.recipient_email || "Inconnu",
             status: t.status as TransactionStatus,
             date: t.created_at,
             direction: t.direction,
-            sourceCountry: t.source_country,           // Directement depuis le backend
-            destinationCountry: t.destination_country, // Directement depuis le backend
-            comment: t.comment,                        // Commentaire depuis le backend
-            recipientIban: t.recipient_iban,           // IBAN si disponible
-            reasons: t.reasons                         // Raisons du blocage IA
+            sourceCountry: t.source_country,
+            destinationCountry: t.destination_country,
+            comment: t.comment,
+            recipientIban: t.recipient_iban,
+            reasons: t.reasons
         }));
 
     } catch (error) {

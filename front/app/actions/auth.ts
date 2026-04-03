@@ -17,7 +17,7 @@ const LoginSchema = z.object({
     password: z.string().min(1),
 });
 
-export async function registerAction(prevState: any, formData: FormData) {
+export async function registerAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
     const data = {
         full_name: formData.get("name"),
         email: formData.get("email"),
@@ -26,7 +26,7 @@ export async function registerAction(prevState: any, formData: FormData) {
 
     const validated = RegisterSchema.safeParse(data);
     if (!validated.success) {
-        return { error: "Données invalides" };
+        return { error: "Données invalides", success: false, message: "" };
     }
 
     try {
@@ -39,12 +39,12 @@ export async function registerAction(prevState: any, formData: FormData) {
         if (!res.ok) {
             const errorData = await res.json();
             if (Array.isArray(errorData.detail)) {
-                const messages = errorData.detail.map((err: any) =>
+                const messages = errorData.detail.map((err: { loc: (string | number)[]; msg: string }) =>
                     `${err.loc[1] || 'Champ'}: ${err.msg}`
                 ).join('. ');
-                return { error: messages };
+                return { error: messages, success: false, message: "" };
             }
-            return { error: errorData.detail || "Erreur lors de l'inscription" };
+            return { error: errorData.detail || "Erreur lors de l'inscription", success: false, message: "" };
         }
 
         const { access_token } = await res.json();
@@ -63,13 +63,13 @@ export async function registerAction(prevState: any, formData: FormData) {
     } catch (err) {
         if ((err as Error).message === "NEXT_REDIRECT") throw err;
         console.error("Register Error:", err);
-        return { error: "Erreur de connexion au serveur", success: false };
+        return { error: "Erreur de connexion au serveur", success: false, message: "" };
     }
 
-    return { success: true, error: '' };
+    return { success: true, error: '', message: "Compte créé avec succès" };
 }
 
-export async function loginAction(prevState: any, formData: FormData) {
+export async function loginAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
     const data = {
         email: formData.get("email"),
         password: formData.get("password"),
@@ -77,7 +77,7 @@ export async function loginAction(prevState: any, formData: FormData) {
 
     const validated = LoginSchema.safeParse(data);
     if (!validated.success) {
-        return { error: "Email ou mot de passe invalide" };
+        return { error: "Email ou mot de passe invalide", success: false, message: "" };
     }
 
     try {
@@ -95,7 +95,7 @@ export async function loginAction(prevState: any, formData: FormData) {
         if (!res.ok) {
             const errorText = await res.text();
             console.error(`[LOGIN] Error response: ${errorText}`);
-            return { error: "Identifiants incorrects" };
+            return { error: "Identifiants incorrects", success: false, message: "" };
         }
 
         const { access_token } = await res.json();
@@ -115,10 +115,10 @@ export async function loginAction(prevState: any, formData: FormData) {
     } catch (err) {
         if ((err as Error).message === "NEXT_REDIRECT") throw err;
         console.error("Login Error:", err);
-        return { error: "Erreur de connexion au serveur", success: false };
+        return { error: "Erreur de connexion au serveur", success: false, message: "" };
     }
 
-    return { success: true, error: '' };
+    return { success: true, error: '', message: "Connexion réussie" };
 }
 
 export async function logoutAction() {

@@ -1,11 +1,10 @@
 import Link from "next/link";
-import { ArrowRight, CreditCard, Download, MoreHorizontal, Plus, Send, Wallet, HandCoins } from "lucide-react";
+import { MoreHorizontal, Plus, Send, HandCoins } from "lucide-react";
 import { TransactionItem } from "@/components/transactions/transaction-item";
 import { ContactHomeItem } from "@/components/contacts/contact-home-item";
 import { Transaction, TransactionStatus } from "@/types/transaction";
 import { GlassCard } from "@/components/ui/glass-card";
 import { ActionButton } from "@/components/ui/action-button";
-import { AnalyticsChart } from "@/components/ui/chart";
 import { PendingRequestsWidget } from "@/components/ui/pending-requests-widget";
 import { cn } from "@/lib/utils";
 import { cookies } from "next/headers";
@@ -84,11 +83,21 @@ export default async function Home() {
   // Charger les demandes simulées depuis les cookies
   const cookieStore = await cookies();
   const requestsCookie = cookieStore.get("mock_requests");
-  let mockRequests: any[] = [];
+  let mockRequests: {
+    id: string;
+    to: string;
+    from: string;
+    from_name: string;
+    amount: number;
+    comment: string;
+    status: string;
+    direction: "RECEIVED" | "SENT";
+    date: string;
+  }[] = [];
   if (requestsCookie) {
     try {
       mockRequests = JSON.parse(requestsCookie.value);
-    } catch(e) {}
+    } catch { }
   }
 
   const { user, wallet, recent_transactions, contacts } = dashboardData;
@@ -97,8 +106,8 @@ export default async function Home() {
 
   // IMPORTANT: Re-évaluer la direction dynamiquement pour que les deux côtés voient la vue orientée correctement!
   mockRequests = mockRequests
-    .filter((r: any) => r.to === userEmail || r.from === userEmail)
-    .map((r: any) => {
+    .filter((r) => r.to === userEmail || r.from === userEmail)
+    .map((r) => {
         // Si la demande était adressée à l'utilisateur actuel, elle est REÇUE par eux
         const isReceived = r.to === userEmail;
         return {
@@ -107,7 +116,7 @@ export default async function Home() {
         };
     });
 
-  const recentTransactions: Transaction[] = recent_transactions.map((t: any) => ({
+  const recentTransactions: Transaction[] = recent_transactions.map((t) => ({
     id: t.transaction_id,
     amount: t.amount,
     recipient: t.recipient_name || "Inconnu",
@@ -116,11 +125,11 @@ export default async function Home() {
     direction: t.direction as 'INCOMING' | 'OUTGOING' // Explicitly map direction
   }));
 
-  const resolvedRequests = mockRequests.filter((r: any) => r.status !== "PENDING").map((r: any) => ({
+  const resolvedRequests: Transaction[] = mockRequests.filter((r) => r.status !== "PENDING").map((r) => ({
     id: r.id,
     amount: r.amount,
     recipient: r.direction === "RECEIVED" ? (r.from_name || r.from || "Contact") : r.to,
-    status: r.status === "ACCEPTED" ? "VALIDATED" : "REJECTED",  // Map to TransactionStatus
+    status: (r.status === "ACCEPTED" ? "VALIDATED" : "REJECTED") as TransactionStatus,  // Map to TransactionStatus
     date: r.date,
     direction: r.direction === "RECEIVED" ? "OUTGOING" : "INCOMING", // Si je reçois une demande et que je l'accepte, je transfère de l'argent (OUTGOING)
     comment: r.comment ? `Suite à demande : ${r.comment}` : "Suite à une demande"
@@ -314,7 +323,7 @@ export default async function Home() {
             `}} />
             <div className="flex flex-col gap-3 overflow-y-auto pr-1 flex-1 no-scrollbar" style={{ maxHeight: '600px' }}>
               {allTransactions.length > 0 ? (
-                allTransactions.map((t: any) => (
+                allTransactions.map((t) => (
                   <TransactionItem key={t.id} transaction={t} />
                 ))
               ) : (

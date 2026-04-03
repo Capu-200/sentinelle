@@ -18,7 +18,7 @@ export async function addContactAction(formData: FormData) {
     }
 
     try {
-        const payload: any = { name };
+        const payload: { name: string; email?: string; iban?: string } = { name };
         if (email) payload.email = email;
         if (iban) payload.iban = iban;
 
@@ -38,7 +38,7 @@ export async function addContactAction(formData: FormData) {
 
         revalidatePath("/contacts");
         return { success: true };
-    } catch (error) {
+    } catch {
         return { success: false, error: "Network error" };
     }
 }
@@ -66,7 +66,7 @@ export async function deleteContactAction(contactId: string) {
 
         revalidatePath("/contacts");
         return { success: true };
-    } catch (error) {
+    } catch {
         return { success: false, error: "Network error" };
     }
 }
@@ -91,7 +91,7 @@ export async function getContactsAction() {
         }
 
         return await res.json();
-    } catch (error) {
+    } catch {
         return [];
     }
 }

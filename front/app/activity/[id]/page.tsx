@@ -3,7 +3,7 @@
 import { useTransactionSocket } from "@/hooks/use-transaction-socket";
 import { TransactionStatus } from "@/types/transaction";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { ArrowLeft, CheckCircle2, Circle, Clock, Loader2, ShieldAlert, ShieldCheck, AlertTriangle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Loader2, ShieldAlert, ShieldCheck, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -122,7 +122,7 @@ export default function TrackingPage() {
                                                 Analyse approfondie en cours
                                             </p>
                                             <p className="text-xs text-orange-700 dark:text-orange-300">
-                                                Nos experts vérifient cette transaction. Aucune action n'est requise de votre part.
+                                                Nos experts vérifient cette transaction. Aucune action n&apos;est requise de votre part.
                                             </p>
                                         </div>
                                     )}

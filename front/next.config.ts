@@ -5,10 +5,6 @@ const nextConfig: NextConfig = {
   experimental: {
     // ... other experimental options if any
   },
-  // @ts-ignore - Turbopack root config might not be in official types yet
-  turbopack: {
-    root: '..',
-  },
 };
 
 export default nextConfig;

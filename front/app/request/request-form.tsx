@@ -57,7 +57,6 @@ export function RequestForm({ contacts: initialContacts, currentUserEmail, curre
         message: "",
     };
 
-    // @ts-ignore
     const [state, formAction] = useActionState(createRequestAction, initialState);
 
     const [contacts, setContacts] = useState<Contact[]>(initialContacts);
