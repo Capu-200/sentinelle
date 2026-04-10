@@ -79,9 +79,25 @@ export const TransactionItem = ({ transaction }: Props) => {
                         )}
                     </div>
                     <div className="min-w-0 flex-1 pr-2">
-                        <p className="font-medium text-sm text-foreground truncate" title={transaction.recipient}>{transaction.recipient}</p>
+                        <div className="flex items-center gap-1.5 font-medium text-sm text-foreground truncate" title={transaction.recipient}>
+                            {isIncoming ? (
+                                <>
+                                    <span className="truncate max-w-[120px] md:max-w-xs">{transaction.recipient}</span>
+                                    <span className="text-slate-500 font-normal">→</span>
+                                    <span className="font-bold text-indigo-400 dark:text-indigo-300">Moi</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="font-bold text-indigo-400 dark:text-indigo-300">Moi</span>
+                                    <span className="text-slate-500 font-normal">→</span>
+                                    <span className="truncate max-w-[120px] md:max-w-xs">{transaction.recipient}</span>
+                                </>
+                            )}
+                        </div>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                            <span className="flex-shrink-0">{new Date(transaction.date).toLocaleDateString()}</span>
+                            <span className="flex-shrink-0">
+                                {new Date(transaction.date).toLocaleDateString('fr-FR')} à {new Date(transaction.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
                             <CountryRouteDisplay />
                         </div>
                     </div>
