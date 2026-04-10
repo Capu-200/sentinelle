@@ -127,6 +127,26 @@ export async function logoutAction() {
     redirect("/login");
 }
 
+export async function deleteAccountAction() {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("auth-token")?.value;
+    
+    if (token) {
+        try {
+            // Appeler la nouvelle route backend qui fait current_user.is_active = False
+            await fetch(`${API_URL}/auth/archive`, {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+        } catch (e) {
+            console.error("Erreur gérée silencieusement lors de l'archivage RGPD", e);
+        }
+    }
+
+    cookieStore.delete("auth-token");
+    return { success: true };
+}
+
 // Unified state type — required to avoid useActionState overload TS error on Vercel
 export type AuthActionState = { error: string; success: boolean; message: string };
 

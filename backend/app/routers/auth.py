@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 from ..database import get_db
 from ..models import User, Wallet
 from ..schemas import UserCreate, UserLogin, Token, ForgotPasswordRequest, ResetPasswordRequest
-from ..auth import get_password_hash, verify_password, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
+from ..auth import get_password_hash, verify_password, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES, get_current_user
 from datetime import timedelta
 import uuid
 
@@ -79,6 +79,12 @@ def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+        
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Compte fermé ou archivé",
+        )
     
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
@@ -109,3 +115,10 @@ def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db))
     db.add(user)
     db.commit()
     return {"message": "Mot de passe réinitialisé avec succès"}
+
+@router.post("/archive")
+def archive_account(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    current_user.is_active = False
+    db.add(current_user)
+    db.commit()
+    return {"message": "Compte archivé RGPD/LCB-FT"}

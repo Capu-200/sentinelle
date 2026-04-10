@@ -4,6 +4,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { GlassCard } from "@/components/ui/glass-card";
+import { DeleteAccountButton } from "@/components/profile/delete-account-button";
 
 const API_URL = "https://sentinelle-api-backend-ntqku76mya-ew.a.run.app";
 
@@ -92,10 +93,14 @@ export default async function ProfilePage() {
         </div>
 
         <form action={logoutAction} className="pt-6">
-          <button className="w-full py-3 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 dark:text-red-400 font-medium transition-colors">
+          <button className="w-full py-3 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 font-medium transition-colors mb-4">
             Se déconnecter
           </button>
         </form>
+
+        <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+          <DeleteAccountButton />
+        </div>
       </GlassCard>
     </div>
   );

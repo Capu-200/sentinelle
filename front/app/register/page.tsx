@@ -181,6 +181,19 @@ export default function RegisterPage() {
                             </div>
                         )}
 
+                        <div className="flex items-start gap-3 mt-2">
+                            <input 
+                                type="checkbox" 
+                                required 
+                                id="cgu_ia" 
+                                name="cgu_ia"
+                                className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                            />
+                            <label htmlFor="cgu_ia" className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                                J'accepte les CGU et consens explicitement à ce que mes transactions et mon comportement soient analysés par l'<strong>Intelligence Artificielle de PayOn</strong> afin de prévenir la fraude et calculer mon <em>Score de Confiance</em> en temps réel.
+                            </label>
+                        </div>
+
                         <SubmitButton />
                     </form>
 
