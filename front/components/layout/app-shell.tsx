@@ -18,7 +18,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Sidebar />
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col lg:pl-64 transition-all w-full">
+            <div className="flex-1 flex flex-col min-w-0 lg:pl-64 transition-all w-full leading-relaxed">
 
                 {/* Mobile Header */}
                 <Header />

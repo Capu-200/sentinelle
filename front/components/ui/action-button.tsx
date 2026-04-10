@@ -20,7 +20,7 @@ export const ActionButton = ({ icon: Icon, label, href, onClick, variant = "seco
 
     const content = (
         <>
-            <Icon className="text-white" />
+            <Icon className="w-5 h-5" />
             <span className="font-semibold text-sm">{label}</span>
         </>
     );

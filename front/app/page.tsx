@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MoreHorizontal, Plus, Send, HandCoins } from "lucide-react";
+import { MoreHorizontal, Plus, Send, HandCoins, ShieldCheck, AlertTriangle, ShieldAlert } from "lucide-react";
 import { TransactionItem } from "@/components/transactions/transaction-item";
 import { ContactHomeItem } from "@/components/contacts/contact-home-item";
 import { Transaction, TransactionStatus } from "@/types/transaction";
@@ -108,12 +108,12 @@ export default async function Home() {
   mockRequests = mockRequests
     .filter((r) => r.to === userEmail || r.from === userEmail)
     .map((r) => {
-        // Si la demande était adressée à l'utilisateur actuel, elle est REÇUE par eux
-        const isReceived = r.to === userEmail;
-        return {
-            ...r,
-            direction: isReceived ? "RECEIVED" : "SENT"
-        };
+      // Si la demande était adressée à l'utilisateur actuel, elle est REÇUE par eux
+      const isReceived = r.to === userEmail;
+      return {
+        ...r,
+        direction: isReceived ? "RECEIVED" : "SENT"
+      };
     });
 
   const recentTransactions: Transaction[] = recent_transactions.map((t) => ({
@@ -163,9 +163,17 @@ export default async function Home() {
         <div>
           <div className="flex items-center gap-3 mb-1">
             <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Bonjour,</p>
-            <span className={cn("text-xs px-2.5 py-0.5 rounded-full border font-bold tracking-wide", getRiskBadgeColor(user.risk_level))}>
-              {user.risk_level === 'LOW' ? 'VÉRIFIÉ' : user.risk_level}
-            </span>
+            <div className={cn("text-[10px] sm:text-xs flex items-center px-2.5 py-1 rounded-full border font-bold tracking-wide uppercase", getRiskBadgeColor(user.risk_level))}>
+              {user.risk_level === 'LOW' && <ShieldCheck className="w-3.5 h-3.5 mr-1.5" />}
+              {user.risk_level === 'MEDIUM' && <AlertTriangle className="w-3.5 h-3.5 mr-1.5" />}
+              {user.risk_level === 'HIGH' && <ShieldAlert className="w-3.5 h-3.5 mr-1.5" />}
+              <span>
+                {user.risk_level === 'LOW' ? 'Compte Vérifié' :
+                  user.risk_level === 'MEDIUM' ? 'Compte Limité' :
+                    user.risk_level === 'HIGH' ? 'Compte Restreint' :
+                      user.risk_level}
+              </span>
+            </div>
           </div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">
             {user.display_name}
@@ -317,7 +325,8 @@ export default async function Home() {
               </Link>
             </div>
 
-            <style dangerouslySetInnerHTML={{__html: `
+            <style dangerouslySetInnerHTML={{
+              __html: `
               .no-scrollbar::-webkit-scrollbar { display: none; }
               .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
             `}} />
